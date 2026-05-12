@@ -16,7 +16,8 @@ _logger.setLevel(logging.DEBUG)
 
 _token = ""
 _session = requests.Session()
-_config_dir = os.path.dirname(os.path.abspath(__file__))
+_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
+os.makedirs(_config_dir, exist_ok=True)
 
 
 def _load_token():

@@ -5,7 +5,7 @@ import os
 from . import client
 from .models import User, RunStandard, OauthToken
 
-_config_dir = os.path.dirname(os.path.abspath(__file__))
+_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
 _USER_FILE = os.path.join(_config_dir, ".user")
 
 

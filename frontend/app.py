@@ -25,14 +25,15 @@ _load_env()
 
 from api import auth, run, club, ctx
 from frontend.logger import logger
+from scheduler import load_state, save_state
 
 st.set_page_config(page_title="行迹", page_icon=None, layout="centered")
 
 st.markdown("""
 <style>
-    #MainMenu, header, footer { visibility: hidden; }
-    .block-container { padding-top: 0.5rem; max-width: 720px; }
-    section[data-testid="stSidebar"] { width: 180px !important; min-width: 180px !important; }
+    #MainMenu, footer { display: none; }
+    .block-container { padding-top: 3.5rem; max-width: 720px; }
+    section[data-testid="stSidebar"] { width: 220px !important; min-width: 220px !important; }
     section[data-testid="stSidebar"] .block-container { padding: 0.8rem; }
     section[data-testid="stSidebar"] hr { margin: 0.4rem 0; }
     .card { background:#fafafa; border-radius:10px; padding:0.8rem; margin-bottom:0.5rem; border:1px solid #eee; }
@@ -126,11 +127,18 @@ def draw_map_folium(coords):
     folium.PolyLine(coords, color="#FF4B4B", weight=3, opacity=0.85).add_to(m)
     folium.CircleMarker(coords[0], radius=5, color="#FF4B4B", fill=True).add_to(m)
     folium.CircleMarker(coords[-1], radius=5, color="#FF4B4B", fill=True).add_to(m)
-    # Save to temp file and use iframe
     tmp = tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8")
     tmp.write(m.get_root().render())
     tmp.close()
     return tmp.name
+
+def random_point_nearby(lat, lng, radius=100):
+    """在中心点 radius 米范围内随机取一点"""
+    angle = random.random() * 2 * math.pi
+    r = math.sqrt(random.random()) * radius
+    dx = r * math.cos(angle) / (111320 * math.cos(math.radians(float(lat))))
+    dy = r * math.sin(angle) / 111320
+    return str(float(lat) + dy), str(float(lng) + dx)
 
 
 if "page" not in st.session_state:
@@ -139,7 +147,7 @@ for k in ["run_info", "records", "activities", "my_acts", "club_types", "semeste
     if k not in st.session_state:
         st.session_state[k] = None
 
-PAGES = ["首页", "跑步", "俱乐部", "我的"]
+PAGES = ["首页", "跑步", "俱乐部", "我的", "关于"]
 
 
 if not ctx.user.studentId:
@@ -257,7 +265,15 @@ elif page == "跑步":
         map_path = draw_map_folium(track)
         st.iframe(map_path, height=400)
 
-        pts_str = json.dumps([f"{p[1]},{p[0]}" for p in track], ensure_ascii=False)
+        ts_base = int(datetime.now().timestamp() * 1000)
+        interval = int((duration * 60 * 1000) / max(len(track), 1))
+        pts_str = json.dumps(
+            [
+                f"{p[1]}-{p[0]}-{ts_base + i * interval}-{round(random.uniform(3, 15), 1)}"
+                for i, p in enumerate(track)
+            ],
+            ensure_ascii=False,
+        )
         if speed_ok and st.button("提交跑步记录", key="run_submit", type="primary", use_container_width=True):
             r = api_call(run.save_run_record_v2,
                 distance=dist, time=duration,
@@ -402,6 +418,31 @@ elif page == "俱乐部":
         else:
             if upcoming:
                 st.markdown("##### 待签到 / 待签退")
+
+                auto_key = "auto_sign_enabled"
+                if auto_key not in st.session_state:
+                    st.session_state[auto_key] = load_state().get("enabled", False)
+
+                c_auto1, c_auto2 = st.columns([2, 1])
+                with c_auto1:
+                    if st.button(
+                        "自动签到/签退 (开启)" if not st.session_state[auto_key]
+                        else "自动签到/签退 (关闭)",
+                        key="auto_sign_toggle",
+                        use_container_width=True,
+                    ):
+                        st.session_state[auto_key] = not st.session_state[auto_key]
+                        save_state({"enabled": st.session_state[auto_key]})
+                        st.rerun()
+                with c_auto2:
+                    if load_state().get("enabled", False):
+                        st.success("运行中")
+                    else:
+                        st.caption("每60秒检测一次")
+
+                if st.session_state[auto_key]:
+                    st.warning("此功能需保持程序常驻后台运行，请勿在其它设备登录当前账号")
+
                 for a in upcoming:
                     is_signed = get_sign_status(a, sd, cur_aid)
                     is_cur = a["clubActivityId"] == cur_aid
@@ -423,27 +464,34 @@ elif page == "俱乐部":
                     )
                     c1, c2 = st.columns([3, 1])
                     has_ll = bool(sd.get("latitude") and sd.get("longitude"))
-                    lat_v = sd["latitude"] if (is_cur and has_ll) else "30.552"
-                    lng_v = sd["longitude"] if (is_cur and has_ll) else "103.994"
+                    if is_cur and has_ll:
+                        lat_v, lng_v = random_point_nearby(sd["latitude"], sd["longitude"], 100)
+                    else:
+                        lat_v, lng_v = None, None
+                    if not has_ll:
+                        st.caption("坐标数据缺失，签到暂时不可用")
                     with c1:
                         if st.button(
                             label, key=k, use_container_width=True, type="primary"
                         ):
-                            r = api_call(
-                                club.sign_in_or_back,
-                                a["clubActivityId"],
-                                lat_v,
-                                lng_v,
-                                "1" if label == "签到" else "2",
-                            )
-                            if r:
-                                st.success(
-                                    f"{label}成功"
-                                    if r.get("code") == 10000
-                                    else f"{label}失败: {r.get('msg', '未知错误')}"
+                            if not lat_v or not lng_v:
+                                st.error("签到失败: 无法获取活动坐标")
+                            else:
+                                r = api_call(
+                                    club.sign_in_or_back,
+                                    a["clubActivityId"],
+                                    lat_v,
+                                    lng_v,
+                                    "1" if label == "签到" else "2",
                                 )
-                                if r.get("code") == 10000:
-                                    st.rerun()
+                                if r:
+                                    st.success(
+                                        f"{label}成功"
+                                        if r.get("code") == 10000
+                                        else f"{label}失败: {r.get('msg', '未知错误')}"
+                                    )
+                                    if r.get("code") == 10000:
+                                        st.rerun()
                     with c2:
                         if st.button(
                             "取消报名",
@@ -484,12 +532,23 @@ elif page == "我的":
         c1.metric("有效天数", rd3.get("runValidDay", 0))
         c2.metric("总距离(米)", rd3.get("runValidDistance", 0))
         c3.metric("配速", rd3.get("showSpeed", "-"))
+
+
+# ═══════════════ 关于 ═══════════════
+elif page == "关于":
+    st.markdown("### 行迹 PaceTrace")
+    st.markdown("校园跑管理工具")
     st.divider()
-    st.markdown("#### 操作日志")
-    if st.button("刷新日志", use_container_width=True, key="ref_log"):
-        log_path = os.path.join(os.path.dirname(__file__), "logs", "app.log")
-        if os.path.exists(log_path):
-            with open(log_path, encoding="utf-8") as f:
-                st.session_state.log_content = f.read()
-    with st.expander("查看详细日志"):
-        st.text_area("日志内容", st.session_state.log_content or "", height=400, label_visibility="collapsed")
+    st.markdown("""
+**授权协议**
+
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
+
+**合理使用声明**
+
+1. 本软件仅供个人学习、研究使用
+2. 使用者应遵守所在学校的校园跑相关规定
+3. 开发者不对因使用本软件产生的任何后果承担责任
+4. 本软件不收集、上传任何用户个人信息
+5. 所有数据仅存储在用户本地设备
+    """)

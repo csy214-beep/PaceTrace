@@ -2,5 +2,7 @@
 
 folium==0.20.0
 pandas==3.0.3
+pillow==12.2.0
+pystray==0.19.5
 requests==2.34.0
 streamlit==1.57.0

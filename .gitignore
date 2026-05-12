@@ -4,6 +4,8 @@ tanma.unirun
 *.zip
 __pycache__
 .token
-logs
+*.log
 .user
 .env
+.data
+amap-coordinate-picking/**
