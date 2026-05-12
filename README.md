@@ -16,8 +16,8 @@ A campus run management dashboard with club activity support, auto sign-in sched
 ## Quick Start
 
 ```bash
-git clone https://github.com/csy214-beep/pacetrace.git
-cd pacetrace
+git clone https://github.com/csy214-beep/PaceTrace.git
+cd PaceTrace
 python -m venv .venv
 # source .venv/bin/activate    # Linux / macOS
 .venv\Scripts\activate         # Windows

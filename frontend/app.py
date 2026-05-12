@@ -622,5 +622,5 @@ elif page == "关于":
 4. 本软件不收集、上传任何用户个人信息
 5. 所有数据仅存储在用户本地设备
 
-[GitHub](https://github.com/csy214-beep/pacetrace) · [ISSUE](https://github.com/csy214-beep/pacetrace/issues) · [PR](https://github.com/csy214-beep/pacetrace/pulls)
+[GitHub](https://github.com/csy214-beep/PaceTrace) · [ISSUE](https://github.com/csy214-beep/PaceTrace/issues) · [PR](https://github.com/csy214-beep/PaceTrace/pulls)
     """)
