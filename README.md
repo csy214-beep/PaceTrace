@@ -59,6 +59,12 @@ AMAP_SECURITY=your_amap_security_code
 └── .env              # Environment configuration
 ```
 
+## Thanks
+
+- maps from yanyaoli/byerun-web and the repo's contributors. (CC BY-NC 4.0)
+- core idea from <https://www.jysafe.cn/4707.air>
+- coding by opencode.
+
 ## License
 
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
