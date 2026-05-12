@@ -1,0 +1,9 @@
+.venv
+.streamlit
+tanma.unirun
+*.zip
+__pycache__
+.token
+logs
+.user
+.env
