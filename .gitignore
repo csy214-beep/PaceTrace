@@ -8,4 +8,4 @@ __pycache__
 .user
 .env
 .data
-amap-coordinate-picking/**
+amap-coordinate-picking

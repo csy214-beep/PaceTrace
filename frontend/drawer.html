@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>轨迹绘制 - 行迹</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+.sidebar{width:300px;min-width:300px;background:#f8f9fa;display:flex;flex-direction:column;border-right:1px solid #e0e0e0}
+.sidebar-h{padding:.8rem 1rem;border-bottom:1px solid #e0e0e0}
+.sidebar-h h2{font-size:1rem;color:#FF4B4B}
+.sidebar-b{flex:1;overflow-y:auto;padding:.5rem 1rem;display:flex;flex-direction:column;gap:.4rem}
+.sidebar-f{padding:.5rem 1rem;border-top:1px solid #e0e0e0;display:flex;flex-direction:column;gap:.3rem}
+.sl{font-size:.75rem;color:#888;margin-top:.5rem}
+.sl:first-child{margin-top:0}
+.btn{padding:.45rem;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:.85rem;text-align:center;transition:all .15s}
+.btn:hover{background:#f0f0f0}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:#FF4B4B;color:#fff;border-color:#FF4B4B}
+.btn-p:hover{background:#e04343}
+.btn-p.active{background:#c0392b}
+.btn-d{background:#dc3545;color:#fff;border-color:#dc3545}
+.btn-d:hover{background:#c82333}
+.btn-s{background:#28a745;color:#fff;border-color:#28a745}
+.btn-s:hover{background:#218838}
+.btn-g{background:#6c757d;color:#fff;border-color:#6c757d}
+.btn-g:hover{background:#5a6268}
+.bg{display:flex;gap:4px}
+.bg .btn{flex:1}
+#map{flex:1;position:relative}
+.ib{padding:.4rem .8rem;border-radius:6px;font-size:.8rem;min-height:2rem;display:flex;align-items:center}
+.ib-ok{background:#e8f5e9;color:#2e7d32}
+.ib-warn{background:#fff3e0;color:#e65100}
+.ib-info{background:#e3f2fd;color:#1565c0}
+.cl{background:#fff;border-radius:6px;border:1px solid #e0e0e0;max-height:200px;overflow-y:auto;font-size:.78rem;font-family:monospace}
+.ci{padding:2px 6px;border-bottom:1px solid #f5f5f5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-h"><h2>轨迹绘制</h2></div>
+    <div class="sidebar-b">
+      <div class="sl">绘制模式</div>
+      <div class="bg">
+        <button class="btn" id="btnContinuous">连续绘制</button>
+        <button class="btn" id="btnSingle">单点绘制</button>
+      </div>
+      <div id="modeStatus" class="ib ib-info">选择一种绘制模式开始</div>
+      <div class="sl">操作</div>
+      <div class="bg">
+        <button class="btn btn-s" id="btnFinish" disabled>完成线段</button>
+        <button class="btn" id="btnUndo" disabled>撤销</button>
+        <button class="btn btn-d" id="btnClear">清除全部</button>
+      </div>
+      <div class="sl">轨迹点 <span id="pc" style="color:#888;font-weight:normal;">(0)</span></div>
+      <div class="cl" id="cl"></div>
+      <div class="sl">文件</div>
+      <button class="btn btn-p" id="btnSave">保存 (下载 JSON)</button>
+      <button class="btn" id="btnLoadFile">加载 JSON</button>
+      <input type="file" id="fi" accept=".json" style="display:none">
+    </div>
+    <div class="sidebar-f">
+      <button class="btn btn-g" id="btnClose">关闭</button>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script>
+var KEY = "{{AMAP_KEY}}", SEC = "{{AMAP_SECURITY}}";
+if (SEC && SEC.length > 0) window._AMapSecurityConfig = { securityJsCode: SEC };
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key={{AMAP_KEY}}"></script>
+<script>
+(function(){
+if (!KEY || KEY === "") { document.body.innerHTML='<div style="padding:2rem;text-align:center;color:#888"><h2>未配置 Key</h2><p>请在 .env 中设置 AMAP_KEY</p></div>'; return; }
+
+var map, polyline, markers=[], pts=[];
+var mode = null, continuousActive = false;
+
+function init(){
+  map = new AMap.Map("map", {zoom:14, center:[104.07,30.57]});
+  map.plugin(["AMap.ToolBar","AMap.Scale"],function(){
+    map.addControl(new AMap.ToolBar());
+    map.addControl(new AMap.Scale());
+  });
+  document.getElementById("map").addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+  map.on("click", function(e){
+    if (mode === 'single') {
+      addPt(e.lnglat.lng, e.lnglat.lat, true);
+      return;
+    }
+    if (mode === 'continuous') {
+      continuousActive = !continuousActive;
+      document.getElementById("btnFinish").disabled = !continuousActive;
+      if (continuousActive) {
+        addPt(e.lnglat.lng, e.lnglat.lat, true);
+        sb("连续绘制中，移动鼠标绘制轨迹，再次点击结束", "ib-warn");
+      } else {
+        if (window._clTimer) { clearTimeout(window._clTimer); window._clTimer = null; }
+        refreshUI();
+        sb("线段已结束，点击可继续绘制", "ib-info");
+      }
+    }
+  });
+
+  map.on("mousemove", function(e){
+    if (mode === 'continuous' && continuousActive) {
+      pts.push([e.lnglat.lng, e.lnglat.lat]);
+      updatePolyline();
+      document.getElementById("pc").textContent = "(" + pts.length + ")";
+      if (!window._clTimer) {
+        window._clTimer = setTimeout(function(){
+          window._clTimer = null;
+          var cl = document.getElementById("cl");
+          cl.innerHTML = pts.map(function(p,i){
+            return '<div class="ci">'+(i+1)+'. '+p[1].toFixed(6)+', '+p[0].toFixed(6)+'</div>';
+          }).join("");
+          cl.scrollTop = cl.scrollHeight;
+        }, 500);
+      }
+    }
+  });
+
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && mode === 'continuous' && continuousActive) finishSegment();
+  });
+
+  sb("就绪", "ib-info");
+}
+
+function sb(msg, cls){
+  var el = document.getElementById("modeStatus");
+  el.textContent = msg;
+  el.className = "ib " + (cls||"ib-info");
+}
+
+function addPt(lng, lat, showMarker){
+  pts.push([lng, lat]);
+  if(showMarker !== false){
+    var mk = new AMap.Marker({
+      position: new AMap.LngLat(lng, lat),
+      offset: new AMap.Pixel(-3,-3),
+      content: '<div style="width:6px;height:6px;background:#FF4B4B;border-radius:50%"></div>'
+    });
+    map.add(mk);
+    markers.push(mk);
+  }
+  updatePolyline();
+  refreshUI();
+}
+
+function updatePolyline(){
+  if(polyline){ map.remove(polyline); polyline = null; }
+  if(pts.length < 2) return;
+  polyline = new AMap.Polyline({
+    path: pts.map(function(p){ return new AMap.LngLat(p[0],p[1]); }),
+    strokeColor: "#FF4B4B", strokeWeight: 4, strokeOpacity: 0.85, lineJoin: "round"
+  });
+  map.add(polyline);
+}
+
+function refreshUI(){
+  document.getElementById("pc").textContent = "(" + pts.length + ")";
+  document.getElementById("btnUndo").disabled = pts.length === 0;
+  var cl = document.getElementById("cl");
+  cl.innerHTML = pts.map(function(p,i){
+    return '<div class="ci">'+(i+1)+'. '+p[1].toFixed(6)+', '+p[0].toFixed(6)+'</div>';
+  }).join("");
+}
+
+function finishSegment(){
+  continuousActive = false;
+  document.getElementById("btnFinish").disabled = true;
+  if (window._clTimer) { clearTimeout(window._clTimer); window._clTimer = null; }
+  refreshUI();
+  sb("线段已完成", "ib-info");
+}
+
+function setMode(newMode){
+  if (newMode === mode) { mode = null; continuousActive = false; }
+  else { mode = newMode; continuousActive = false; }
+  document.getElementById("btnContinuous").classList.toggle("active", mode === 'continuous');
+  document.getElementById("btnSingle").classList.toggle("active", mode === 'single');
+  document.getElementById("btnFinish").disabled = true;
+  if (mode === 'continuous') sb("连续绘制 - 点击地图开始（ESC 结束线段）", "ib-warn");
+  else if (mode === 'single') sb("单点绘制 - 点击地图加点", "ib-ok");
+  else sb("选择绘制模式", "ib-info");
+}
+
+function undo(){
+  if(pts.length === 0) return;
+  pts.pop();
+  if(markers.length > 0) map.remove(markers.pop());
+  updatePolyline(); refreshUI();
+}
+
+function clearAll(){
+  pts = []; markers.forEach(function(m){ map.remove(m); }); markers = [];
+  if(polyline){ map.remove(polyline); polyline = null; }
+  continuousActive = false; document.getElementById("btnFinish").disabled = true;
+  refreshUI(); sb("已清除", "ib-info");
+}
+
+
+
+function exportData(){
+  return {mapId: Date.now().toString(36), mapName: "自定义路线", mapData: pts.map(function(p){ return p[0]+","+p[1]; })};
+}
+
+function saveFile(){
+  if(pts.length < 2){ sb("至少需要 2 个点", "ib-warn"); return; }
+  var data = exportData();
+  var name = "custom_"+new Date().toISOString().slice(0,10)+".json";
+  var blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  sb("已保存", "ib-ok");
+}
+
+function loadFile(file){
+  var r = new FileReader();
+  r.onload = function(e){
+    try {
+      var data = JSON.parse(e.target.result);
+      clearAll();
+      (data.mapData||[]).forEach(function(p){ var sp=p.split(","); addPt(parseFloat(sp[0]),parseFloat(sp[1]),true); });
+      if(pts.length > 0){ try{ map.setFitView(null,false,[60,60,60,320]); }catch(e){} sb("已加载 "+pts.length+" 个点", "ib-ok"); }
+    } catch(err){ sb("文件格式错误", "ib-warn"); }
+  };
+  r.readAsText(file);
+}
+
+document.getElementById("btnContinuous").addEventListener("click", function(){ setMode('continuous'); });
+document.getElementById("btnSingle").addEventListener("click", function(){ setMode('single'); });
+document.getElementById("btnFinish").addEventListener("click", finishSegment);
+document.getElementById("btnUndo").addEventListener("click", undo);
+document.getElementById("btnClear").addEventListener("click", function(){ if(pts.length>0&&!confirm("清除所有点？")) return; clearAll(); });
+document.getElementById("btnSave").addEventListener("click", saveFile);
+document.getElementById("btnLoadFile").addEventListener("click", function(){ document.getElementById("fi").click(); });
+document.getElementById("fi").addEventListener("change", function(e){ if(e.target.files[0]) loadFile(e.target.files[0]); e.target.value=""; });
+document.getElementById("btnClose").addEventListener("click", function(){ window.close(); });
+
+init();
+})();
+</script>
+</body>
+</html>

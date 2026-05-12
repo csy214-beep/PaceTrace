@@ -4,9 +4,39 @@ import os
 import sys
 import threading
 import time
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from dotenv import load_dotenv
 
 _PDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _PDIR)
+load_dotenv(os.path.join(_PDIR, ".env"))
+
+DRAWER_PORT = 8852
+
+
+class DrawerHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/drawer.html" or self.path.startswith("/drawer.html"):
+            amap_key = os.environ.get("AMAP_KEY", "")
+            amap_sec = os.environ.get("AMAP_SECURITY", "")
+            drawer_path = os.path.join(_PDIR, "frontend", "drawer.html")
+            with open(drawer_path, encoding="utf-8") as f:
+                html = f.read()
+            html = html.replace("{{AMAP_KEY}}", amap_key)
+            html = html.replace("{{AMAP_SECURITY}}", amap_sec)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
+            return
+        return super().do_GET()
+
+
+def _start_static_server():
+    os.chdir(os.path.join(_PDIR, "frontend"))
+    server = HTTPServer(("127.0.0.1", DRAWER_PORT), DrawerHandler)
+    print(f"[static] drawer at http://127.0.0.1:{DRAWER_PORT}/drawer.html")
+    server.serve_forever()
 
 
 def _start_tray():
@@ -38,13 +68,13 @@ def _start_scheduler():
 
 
 if __name__ == "__main__":
+    threading.Thread(target=_start_static_server, daemon=True).start()
     threading.Thread(target=_start_tray, daemon=True).start()
     threading.Thread(target=_start_scheduler, daemon=True).start()
 
     app = os.path.join(_PDIR, "frontend", "app.py")
     os.system(f"streamlit run \"{app}\"")
 
-    # keep scheduler alive after web page closes
     print("[scheduler] web ui closed, scheduler keeps running in background")
     print("[scheduler] press Ctrl+C or use tray menu to exit")
     while True:

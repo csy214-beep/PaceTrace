@@ -230,9 +230,13 @@ elif page == "跑步":
     if not all_maps:
         st.info("maps 目录下没有路线文件")
     else:
-        names = [m["name"] for m in all_maps]
-        sel_name = st.selectbox("选择路线", names, key="map_sel")
-        sel_map = next(m for m in all_maps if m["name"] == sel_name)
+        all_map_list = list(all_maps)
+        if "custom_maps" in st.session_state:
+            all_map_list.extend(st.session_state.custom_maps)
+        sel_name = st.selectbox(
+            "选择路线", [m["name"] for m in all_map_list], key="map_sel"
+        )
+        sel_map = next(m for m in all_map_list if m["name"] == sel_name)
         full_dist = route_distance(sel_map["coords"])
         st.caption(f"路线全长约 {full_dist} 米")
 
@@ -264,6 +268,44 @@ elif page == "跑步":
             )
         map_path = draw_map_folium(track)
         st.iframe(map_path, height=400)
+
+        if AMAP_KEY:
+            drawer_url = f"http://127.0.0.1:8852/drawer.html"
+            st.markdown(
+                f'<a href="{drawer_url}" target="_blank" rel="noopener" style="display:inline-block;padding:0.4rem 1rem;background:#FF4B4B;color:white;border-radius:6px;text-decoration:none;font-size:0.85rem;margin-bottom:0.5rem;">轨迹绘制器 (新标签页)</a>',
+                unsafe_allow_html=True,
+            )
+
+        uploaded = st.file_uploader(
+            "加载自定义路线 (JSON)", type=["json"], key="custom_map_upload"
+        )
+        if uploaded and "last_uploaded" not in st.session_state:
+            st.session_state.last_uploaded = None
+        if uploaded:
+            file_id = f"{uploaded.name}_{uploaded.size}"
+            if st.session_state.get("last_uploaded") != file_id:
+                st.session_state.last_uploaded = file_id
+                try:
+                    data = json.loads(uploaded.read())
+                    raw = data.get("mapData", [])
+                    if raw:
+                        pts = []
+                        for p in raw:
+                            lng, lat = p.split(",")
+                            pts.append([float(lat), float(lng)])
+                        name = data.get("mapName", uploaded.name)
+                        if "custom_maps" not in st.session_state:
+                            st.session_state.custom_maps = []
+                        cid = f"custom_{len(st.session_state.custom_maps)}_{hash(file_id) % 10000}"
+                        st.session_state.custom_maps.append(
+                            {"id": cid, "name": f"{name} (自定义)", "coords": pts}
+                        )
+                        st.success(f"已加载: {name}")
+                        st.rerun()
+                    else:
+                        st.warning("文件中没有轨迹点数据")
+                except Exception as e:
+                    st.error(f"文件格式错误: {e}")
 
         ts_base = int(datetime.now().timestamp() * 1000)
         interval = int((duration * 60 * 1000) / max(len(track), 1))
@@ -551,4 +593,6 @@ elif page == "关于":
 3. 开发者不对因使用本软件产生的任何后果承担责任
 4. 本软件不收集、上传任何用户个人信息
 5. 所有数据仅存储在用户本地设备
+
+[GitHub](https://github.com/csy214-beep/pacetrace)
     """)
