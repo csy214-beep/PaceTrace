@@ -250,6 +250,10 @@ elif page == "跑步":
                 st.caption(f"配速约 {speed_kmh:.1f} km/h")
 
         track = build_track(sel_map["coords"], dist)
+        if not AMAP_KEY:
+            st.info(
+                "当前使用 OpenStreetMap 预览，效果一般。如需高德地图精确定位，请在项目根目录 .env 文件中设置高德JS API Key"
+            )
         map_path = draw_map_folium(track)
         st.iframe(map_path, height=400)
 
@@ -326,6 +330,7 @@ elif page == "俱乐部":
         if st.button("查询活动", use_container_width=True, type="primary"):
             with st.spinner("查询中..."):
                 st.session_state.activities = api_call(club.get_activity_list, query_time=sel_date, activity_item_id=sel_type_id, page=1, size=50)
+            st.session_state.activity_query_done = True
             st.rerun()
 
         acts = st.session_state.activities
@@ -358,64 +363,109 @@ elif page == "俱乐部":
                             st.session_state.my_acts = api_call(club.get_my_activities)
                             st.rerun()
         else:
-            ri_check = st.session_state.run_info
-            rd_check = ri_check.get("response") if ri_check else {}
-            days = rd_check.get("runValidDay", 0)
-            if days >= 40:
-                st.info("可能学期要求已达标，请自行确认")
-            else:
-                st.info("该日期暂无活动，请换一天试试")
+            if st.session_state.get("activity_query_done"):
+                rd_check = (st.session_state.run_info or {}).get("response") or {}
+                if rd_check.get("runValidDay", 0) >= 40:
+                    st.info("可能学期要求已达标，请自行确认")
+                else:
+                    st.info("该日期暂无活动，请换一天试试")
 
     st.divider()
-    st.markdown("#### 签到签退")
+    st.markdown("#### 需处理的活动")
+
+    def get_sign_status(a, sd, cur_aid):
+        if a["clubActivityId"] == cur_aid:
+            return sd.get("signStatus") == "1"
+        return a.get("signStatus") == "1"
+
+    st.session_state.my_acts = api_call(club.get_my_activities)
     mya = st.session_state.my_acts
     mylist = mya.get("response") if mya else []
     if mylist:
-        pending = [a for a in mylist if a.get("optionStatus") in ("2", "6")]
-        if pending:
-            sign_tf = api_call(club.get_sign_in_tf)
-            sd = sign_tf.get("response") if sign_tf else {}
-            cur_aid = sd.get("activityId")
-            for a in pending:
-                is_cur = a["clubActivityId"] == cur_aid
-                signed = (sd.get("signStatus") == "1" and is_cur)
-                ti = f"{a.get('mmdd')} {a.get('startTime')}-{a.get('endTime')}"
-                if signed:
-                    tag = '<span class="tag-sb">待签退</span>'
-                    label = "签退"
-                    k = f"sback_{a['clubActivityId']}"
-                else:
-                    tag = '<span class="tag-si">待签到</span>'
-                    label = "签到"
-                    k = f"sin_{a['clubActivityId']}"
-                st.markdown(f"<div class='card'><div><b>{a.get('activityName')}</b> {tag}</div><div class='card-sm'>{ti} | {a.get('addressDetail')}</div></div>", unsafe_allow_html=True)
-                c1, c2, c3 = st.columns([2, 2, 1])
-                has_ll = bool(sd.get("latitude") and sd.get("longitude"))
-                if is_cur and has_ll:
-                    lat_v, lng_v = sd["latitude"], sd["longitude"]
-                else:
-                    lat_v = c1.text_input("纬度", "30.552", key=f"lat_{a['clubActivityId']}", label_visibility="collapsed")
-                    lng_v = c2.text_input("经度", "103.994", key=f"lng_{a['clubActivityId']}", label_visibility="collapsed")
-                with c1:
-                    if st.button(label, key=k, use_container_width=True, type="primary"):
-                        t = "1" if label == "签到" else "2"
-                        r = api_call(club.sign_in_or_back, a["clubActivityId"], lat_v, lng_v, t)
-                        if r:
-                            if r.get("code") == 10000:
-                                st.success(f"{label}成功")
-                                st.session_state.my_acts = api_call(club.get_my_activities)
-                                st.rerun()
-                            else:
-                                st.error(f"{label}失败: {r.get('msg', '未知错误')}")
-                with c3:
-                    if st.button("取消报名", key=f"unreg_{a['clubActivityId']}", use_container_width=True):
-                        r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
-                        if r and r.get("code") == 10000:
-                            st.success("已取消")
-                            st.session_state.my_acts = api_call(club.get_my_activities)
-                            st.rerun()
+        sign_tf = api_call(club.get_sign_in_tf)
+        sd = sign_tf.get("response") if sign_tf else {}
+        cur_aid = sd.get("activityId")
+        today_mmdd = datetime.now().strftime("%m-%d")
+
+        upcoming = []
+        history = []
+        for a in mylist:
+            is_signed = get_sign_status(a, sd, cur_aid)
+            act_date = a.get("mmdd", "")
+            if act_date < today_mmdd:
+                history.append(a)
+            else:
+                upcoming.append(a)
+
+        if not upcoming and not history:
+            st.caption("暂无报名记录")
         else:
-            st.caption("暂无待签到的活动")
+            if upcoming:
+                st.markdown("##### 待签到 / 待签退")
+                for a in upcoming:
+                    is_signed = get_sign_status(a, sd, cur_aid)
+                    is_cur = a["clubActivityId"] == cur_aid
+                    tag = (
+                        '<span class="tag-sb">待签退</span>'
+                        if is_signed
+                        else '<span class="tag-si">待签到</span>'
+                    )
+                    label = "签退" if is_signed else "签到"
+                    k = (
+                        f"sback_{a['clubActivityId']}"
+                        if is_signed
+                        else f"sin_{a['clubActivityId']}"
+                    )
+                    ti = f"{a.get('mmdd')} {a.get('startTime')}-{a.get('endTime')}"
+                    st.markdown(
+                        f"<div class='card'><div><b>{a.get('activityName')}</b> {tag}</div><div class='card-sm'>{ti} | {a.get('addressDetail')}</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                    c1, c2 = st.columns([3, 1])
+                    has_ll = bool(sd.get("latitude") and sd.get("longitude"))
+                    lat_v = sd["latitude"] if (is_cur and has_ll) else "30.552"
+                    lng_v = sd["longitude"] if (is_cur and has_ll) else "103.994"
+                    with c1:
+                        if st.button(
+                            label, key=k, use_container_width=True, type="primary"
+                        ):
+                            r = api_call(
+                                club.sign_in_or_back,
+                                a["clubActivityId"],
+                                lat_v,
+                                lng_v,
+                                "1" if label == "签到" else "2",
+                            )
+                            if r:
+                                st.success(
+                                    f"{label}成功"
+                                    if r.get("code") == 10000
+                                    else f"{label}失败: {r.get('msg', '未知错误')}"
+                                )
+                                if r.get("code") == 10000:
+                                    st.rerun()
+                    with c2:
+                        if st.button(
+                            "取消报名",
+                            key=f"unreg_{a['clubActivityId']}",
+                            use_container_width=True,
+                        ):
+                            r = api_call(
+                                club.cancel_activity, activity_id=a["clubActivityId"]
+                            )
+                            if r and r.get("code") == 10000:
+                                st.success("已取消")
+                                st.rerun()
+            if history:
+                with st.expander(f"历史记录 ({len(history)} 条)"):
+                    for a in history:
+                        ti = f"{a.get('mmdd')} {a.get('startTime')}-{a.get('endTime')}"
+                        st.markdown(
+                            f"<div class='card'><div><b>{a.get('activityName')}</b></div><div class='card-sm'>{ti} | {a.get('addressDetail')}</div></div>",
+                            unsafe_allow_html=True,
+                        )
+    else:
+        st.caption("暂无报名记录")
 
 
 # ═══════════════ 我的 ═══════════════
