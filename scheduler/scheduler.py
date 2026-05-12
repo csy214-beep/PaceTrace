@@ -1,12 +1,4 @@
-"""定时签到/签退任务
-
-根据活动时间范围智能调度：
-  活动开始前 10 分钟  -> 开始检测签到
-  活动结束后 10 分钟  -> 停止检测
-
-数据文件: .data/scheduler.json
-结构: {"enabled": bool}
-"""
+"""定时签到/签退任务"""
 import json
 import logging
 import math
@@ -14,6 +6,8 @@ import os
 import random
 import threading
 from datetime import datetime, timedelta
+
+from tray.tray import notify, update_menu as _update_menu
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
 STATE_FILE = os.path.join(DATA_DIR, "scheduler.json")
@@ -102,6 +96,8 @@ class SignScheduler:
         state = load_state()
         state["enabled"] = True
         save_state(state)
+        notify("行迹", "自动签到/签退已开启")
+        _update_menu()
         logger.info("scheduler started")
 
     def stop(self):
@@ -112,6 +108,8 @@ class SignScheduler:
         state = load_state()
         state["enabled"] = False
         save_state(state)
+        notify("行迹", "自动签到/签退已关闭")
+        _update_menu()
         logger.info("scheduler stopped")
 
     def _wait_until_window(self):
@@ -148,6 +146,7 @@ class SignScheduler:
 
     def _tick(self):
         from api.club import get_sign_in_tf, sign_in_or_back
+        from tray.tray import notify
 
         resp = get_sign_in_tf()
         if not resp or resp.get("code") != 10000:
@@ -162,7 +161,7 @@ class SignScheduler:
         lng = data.get("longitude")
 
         if not aid or not lat or not lng:
-            logger.info("tick: missing data")
+            logger.info("tick: missing data (aid=%s lat=%s lng=%s)", aid, lat, lng)
             return
 
         lat_r, lng_r = _random_point(lat, lng, 100)
@@ -172,12 +171,16 @@ class SignScheduler:
             msg = r.get("msg", "?") if r else "no response"
             if r and r.get("code") == 10000:
                 logger.info("auto sign-in OK (activity=%s)", aid)
+                notify("行迹", f"自动签到成功: {data.get('activityName', aid)}")
             else:
                 logger.info("auto sign-in failed: %s", msg)
+                notify("行迹", f"自动签到失败: {msg}")
         elif status == "1":
             r = sign_in_or_back(aid, lat_r, lng_r, "2")
             msg = r.get("msg", "?") if r else "no response"
             if r and r.get("code") == 10000:
                 logger.info("auto sign-back OK (activity=%s)", aid)
+                notify("行迹", f"自动签退成功: {data.get('activityName', aid)}")
             else:
                 logger.info("auto sign-back failed: %s", msg)
+                notify("行迹", f"自动签退失败: {msg}")

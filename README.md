@@ -55,7 +55,7 @@ AMAP_SECURITY=your_amap_security_code
 ├── tray/             # System tray module
 ├── maps/             # Built-in route data (JSON)
 ├── .data/            # Local data (token, user, logs)
-├── run_ui.py         # Application entry point
+├── run.py            # Application entry point
 └── .env              # Environment configuration
 ```
 

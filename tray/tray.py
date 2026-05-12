@@ -15,6 +15,8 @@ _STATE_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     ".data", "scheduler.json",
 )
+_icon: pystray.Icon | None = None
+_lock = threading.Lock()
 
 
 def _create_icon_image(size=64):
@@ -42,10 +44,30 @@ def _open_browser():
     webbrowser.open(_OPEN_URL)
 
 
+def notify(title: str, message: str):
+    """发送托盘通知（线程安全）"""
+    with _lock:
+        if _icon:
+            try:
+                _icon.notify(message, title)
+                logger.info("notify: [%s] %s", title, message)
+            except Exception as e:
+                logger.warning("notify failed: %s", e)
+
+
+def update_menu():
+    """强制刷新托盘菜单"""
+    with _lock:
+        if _icon:
+            try:
+                _icon.update_menu()
+            except Exception:
+                pass
+
+
 class TrayApp:
     def __init__(self):
         self._thread: threading.Thread | None = None
-        self._icon: pystray.Icon | None = None
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -55,13 +77,14 @@ class TrayApp:
         logger.info("tray started")
 
     def stop(self):
-        if self._icon:
-            self._icon.stop()
-            self._icon = None
+        global _icon
+        with _lock:
+            if _icon:
+                _icon.stop()
+                _icon = None
 
-    def _run(self):
-        image = _create_icon_image()
-        menu = pystray.Menu(
+    def _build_menu(self):
+        return pystray.Menu(
             pystray.MenuItem("显示窗口", self._on_show, default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -71,14 +94,25 @@ class TrayApp:
             ),
             pystray.MenuItem("退出", self._on_quit),
         )
-        self._icon = pystray.Icon("xingji", image, "行迹", menu)
-        self._icon.run()
+
+    def _run(self):
+        global _icon
+        image = _create_icon_image()
+        icon = pystray.Icon("xingji", image, "行迹", self._build_menu())
+        with _lock:
+            _icon = icon
+        icon.run()
+        with _lock:
+            _icon = None
 
     def _on_show(self):
         _open_browser()
 
     def _on_quit(self):
+        global _icon
         logger.info("tray: quit")
-        self._icon.stop()
-        self._icon = None
+        with _lock:
+            if _icon:
+                _icon.stop()
+                _icon = None
         os._exit(0)

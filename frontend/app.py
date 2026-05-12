@@ -25,7 +25,8 @@ _load_env()
 
 from api import auth, run, club, ctx
 from frontend.logger import logger
-from scheduler import load_state, save_state
+from scheduler import SignScheduler, load_state, save_state
+from tray.tray import notify
 
 st.set_page_config(page_title="行迹", page_icon=None, layout="centered")
 
@@ -325,11 +326,13 @@ elif page == "跑步":
                 code = r.get("code")
                 if code == 10000:
                     st.success("提交成功")
+                    notify("行迹", "跑步记录提交成功")
                     st.session_state.run_info = api_call(run.get_run_info)
                     st.session_state.records = api_call(run.get_run_records, 1, 10)
                     st.session_state.init_dist = random.randint(1000, 6000)
                 else:
                     st.error(f"提交失败: {r.get('msg', '未知错误')}")
+                    notify("行迹", f"跑步提交失败: {r.get('msg', '未知错误')}")
 
     st.divider()
     st.markdown("#### 跑步记录")
@@ -356,19 +359,28 @@ elif page == "俱乐部":
             if not joined:
                 if st.button(f"加入 {s.get('activityName')}", key=f"js_{s['configurationId']}", use_container_width=True):
                     r = api_call(club.join_or_cancel_semester, s["configurationId"], "add")
-                    if r and r.get("code") == 10000:
-                        st.success("加入成功")
-                        st.session_state.club_types = api_call(club.get_club_projects)
-                        st.session_state.semester_acts = api_call(club.get_semester_activities)
-                        st.rerun()
+                    if r:
+                        if r.get("code") == 10000:
+                            st.success("加入成功")
+                            notify("行迹", f"已加入: {s.get('activityName')}")
+                            st.session_state.club_types = api_call(club.get_club_projects)
+                            st.session_state.semester_acts = api_call(club.get_semester_activities)
+                            st.rerun()
+                        else:
+                            st.error(f"加入失败: {r.get('msg', '未知错误')}")
+                            notify("行迹", f"加入失败: {r.get('msg', '未知错误')}")
             else:
                 if st.button(f"退出 {s.get('activityName')}", key=f"qs_{s['configurationId']}", use_container_width=True):
                     r = api_call(club.join_or_cancel_semester, s["configurationId"], "remove")
-                    if r and r.get("code") == 10000:
-                        st.success("已退出")
-                        st.session_state.club_types = api_call(club.get_club_projects)
-                        st.session_state.semester_acts = api_call(club.get_semester_activities)
-                        st.rerun()
+                    if r:
+                        if r.get("code") == 10000:
+                            st.success("已退出")
+                            notify("行迹", f"已退出: {s.get('activityName')}")
+                            st.session_state.club_types = api_call(club.get_club_projects)
+                            st.session_state.semester_acts = api_call(club.get_semester_activities)
+                            st.rerun()
+                        else:
+                            st.error(f"退出失败: {r.get('msg', '未知错误')}")
     else:
         st.caption("暂无学期项目")
 
@@ -409,16 +421,26 @@ elif page == "俱乐部":
                 if not full and not already:
                     if st.button("报名", key=f"join_{a['clubActivityId']}", use_container_width=True, type="primary"):
                         r = api_call(club.join_activity, activity_id=a["clubActivityId"])
-                        if r and r.get("code") == 10000:
-                            st.success("报名成功")
-                            st.session_state.my_acts = api_call(club.get_my_activities)
-                            st.rerun()
+                        if r:
+                            if r.get("code") == 10000:
+                                st.success("报名成功")
+                                notify("行迹", f"报名成功: {a.get('activityName')}")
+                                st.session_state.my_acts = api_call(club.get_my_activities)
+                                st.rerun()
+                            else:
+                                st.error(f"报名失败: {r.get('msg', '未知错误')}")
+                                notify("行迹", f"报名失败: {r.get('msg', '未知错误')}")
                 if already:
                     if st.button("取消报名", key=f"cancel_{a['clubActivityId']}", use_container_width=True):
                         r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
-                        if r and r.get("code") == 10000:
-                            st.success("已取消")
-                            st.session_state.my_acts = api_call(club.get_my_activities)
+                        if r:
+                            if r.get("code") == 10000:
+                                st.success("已取消")
+                                notify("行迹", f"已取消报名: {a.get('activityName')}")
+                                st.session_state.my_acts = api_call(club.get_my_activities)
+                                st.rerun()
+                            else:
+                                st.error(f"取消失败: {r.get('msg', '未知错误')}")
                             st.rerun()
         else:
             if st.session_state.get("activity_query_done"):
@@ -527,11 +549,13 @@ elif page == "俱乐部":
                                     "1" if label == "签到" else "2",
                                 )
                                 if r:
-                                    st.success(
-                                        f"{label}成功"
-                                        if r.get("code") == 10000
-                                        else f"{label}失败: {r.get('msg', '未知错误')}"
-                                    )
+                                    msg = r.get("msg", "未知错误")
+                                    if r.get("code") == 10000:
+                                        st.success(f"{label}成功")
+                                        notify("行迹", f"{label}成功")
+                                    else:
+                                        st.error(f"{label}失败: {msg}")
+                                        notify("行迹", f"{label}失败: {msg}")
                                     if r.get("code") == 10000:
                                         st.rerun()
                     with c2:
@@ -543,9 +567,13 @@ elif page == "俱乐部":
                             r = api_call(
                                 club.cancel_activity, activity_id=a["clubActivityId"]
                             )
-                            if r and r.get("code") == 10000:
-                                st.success("已取消")
-                                st.rerun()
+                            if r:
+                                if r.get("code") == 10000:
+                                    st.success("已取消")
+                                    notify("行迹", "报名已取消")
+                                    st.rerun()
+                                else:
+                                    st.error(f"取消失败: {r.get('msg', '未知错误')}")
             if history:
                 with st.expander(f"历史记录 ({len(history)} 条)"):
                     for a in history:
@@ -594,5 +622,5 @@ elif page == "关于":
 4. 本软件不收集、上传任何用户个人信息
 5. 所有数据仅存储在用户本地设备
 
-[GitHub](https://github.com/csy214-beep/pacetrace)
+[GitHub](https://github.com/csy214-beep/pacetrace) · [ISSUE](https://github.com/csy214-beep/pacetrace/issues) · [PR](https://github.com/csy214-beep/pacetrace/pulls)
     """)
