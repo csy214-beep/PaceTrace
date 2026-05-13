@@ -235,7 +235,7 @@ class SignScheduler:
             logger.info("tick: missing data (aid=%s lat=%s lng=%s)", aid, lat, lng)
             return
 
-        lat_r, lng_r = _random_point(lat, lng, 100)
+        lat_r, lng_r = _random_point(lat, lng, 200)
 
         if status == "0":
             # 未签到 → 签到

@@ -9,3 +9,7 @@ __pycache__
 .env
 .data
 amap
+*.spec
+dist
+build
+.installed_ver

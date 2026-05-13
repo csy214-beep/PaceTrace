@@ -11,7 +11,25 @@ _PDIR = os.path.dirname(os.path.abspath(__file__))
 _SRC = os.path.join(_PDIR, "src")
 sys.path.insert(0, _PDIR)
 sys.path.insert(0, _SRC)
-load_dotenv(os.path.join(_PDIR, ".env"))
+
+if os.name == "nt":
+    _VENV_PY = os.path.join(_PDIR, ".venv", "Scripts", "python.exe")
+else:
+    _VENV_PY = os.path.join(_PDIR, ".venv", "bin", "python")
+if not os.path.exists(_VENV_PY):
+    _VENV_PY = sys.executable
+
+_env_path = os.path.join(_PDIR, ".env")
+if not os.path.exists(_env_path) and getattr(sys, 'frozen', False):
+    _env_path = os.path.join(os.path.dirname(sys.executable), ".env")
+load_dotenv(_env_path)
+
+# configure file logging for API calls from background threads
+try:
+    from frontend.logger import init_logging
+    init_logging()
+except Exception:
+    pass
 
 DRAWER_PORT = 8852
 
@@ -95,7 +113,15 @@ if __name__ == "__main__":
     threading.Thread(target=_start_run_scheduler, daemon=True).start()
 
     app = os.path.join(_SRC, "frontend", "app.py")
-    os.system(f"streamlit run \"{app}\"")
+    if getattr(sys, 'frozen', False):
+        from streamlit.web import cli as stcli
+        sys.argv = ["streamlit", "run", app]
+        try:
+            stcli.main()
+        except (SystemExit, KeyboardInterrupt):
+            pass
+    else:
+        os.system(f"streamlit run \"{app}\"")
 
     print("[scheduler] web ui closed, scheduler keeps running in background")
     print("[scheduler] press Ctrl+C or use tray menu to exit")

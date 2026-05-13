@@ -5,6 +5,7 @@ from datetime import datetime
 import streamlit as st
 
 from api import run
+from api import ctx
 from frontend.utils import (
     api_call,
     all_maps,
@@ -18,6 +19,59 @@ from tray.tray import notify
 
 
 def show_run_page():
+    st.markdown("#### 跑步")
+
+    # load school standard
+    std_resp = api_call(run.get_run_standard)
+    std = std_resp.get("response") if std_resp else {}
+    gender = ("girl" if st.session_state.get("gender") == "2" else "boy") if st.session_state.get("gender") else None
+    gender = gender or ("girl" if ctx.user.gender == "2" else "boy")
+    once_min = std.get(f"{gender}OnceDistanceMin", 1000)
+    once_max = std.get(f"{gender}OnceDistanceMax", 5000)
+    total_dist = std.get(f"{gender}AllRunDistance", 80000)
+    total_times = std.get(f"{gender}AllRunTime", 24)
+    time_min = std.get(f"{gender}OnceTimeMin", 5)
+    time_max = std.get(f"{gender}OnceTimeMax", 60)
+    semester = std.get("semesterYear", "")
+    first_start = std.get("firstSemesterDateStart", "")
+    first_end = std.get("firstSemesterDateEnd", "")
+    second_start = std.get("secondSemesterDateStart", "")
+    second_end = std.get("secondSemesterDateEnd", "")
+
+    # display standards
+    with st.expander("学校标准", expanded=False):
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"单次距离", f"{once_min}-{once_max}米")
+        c2.metric(f"单次时长", f"{time_min}-{time_max}分钟")
+        c3.metric(f"学期目标", f"{total_dist/1000:.0f}公里/{total_times}次")
+        if first_start:
+            st.caption(f"第一学期: {first_start} ~ {first_end}")
+        if second_start:
+            st.caption(f"第二学期: {second_start} ~ {second_end}")
+
+    # semester progress (current semester only)
+    semester_year = std.get("semesterYear", "")
+    if semester_year:
+        sem_resp = api_call(run.get_run_semester_info, year_semester=semester_year)
+        sem = sem_resp.get("response") if sem_resp else {}
+    else:
+        sem = {}
+    if not sem:
+        sem = {}
+    cur_dist = sem.get("runValidDistance", 0) or 0
+    cur_days = sem.get("runValidDay", 0) or 0
+    dist_pct = min(100, int(cur_dist / total_dist * 100)) if total_dist else 0
+    days_pct = min(100, int(cur_days / total_times * 100)) if total_times else 0
+
+    with st.expander("学期进度", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("已完成距离", f"{cur_dist}米", f"{dist_pct}%")
+            st.progress(dist_pct / 100)
+        with c2:
+            st.metric("已完成次数", f"{cur_days}次", f"{days_pct}%")
+            st.progress(days_pct / 100)
+
     all_map_list = list(all_maps)
     if "custom_maps" in st.session_state:
         all_map_list.extend(st.session_state.custom_maps)
@@ -31,14 +85,15 @@ def show_run_page():
         st.caption(f"路线全长约 {full_dist} 米")
 
         if "init_dist" not in st.session_state:
-            st.session_state.init_dist = random.randint(1000, 6000)
+            st.session_state.init_dist = random.randint(once_min, once_max)
         init_dist = st.session_state.init_dist
         init_pace = random.uniform(4.0, 7.0)
         init_time = max(1, int(init_dist / (init_pace * 1000 / 3600) / 60))
+        init_time = min(init_time, 180)
 
         c1, c2 = st.columns(2)
         with c1:
-            dist = st.number_input("跑步距离(米)", 0, 10000, init_dist, key="run_dist")
+            dist = st.number_input("距离(米)", 0, 20000, init_dist, key="run_dist")
         with c2:
             duration = st.number_input("时长(分钟)", 0, 180, init_time, key="run_dur")
 
@@ -176,9 +231,14 @@ def show_run_page():
             tr[i][1] = c2.text_input("结束", tr[i][1], key=f"run_tr_e{i}")
             if c3.button("删除", key=f"run_tr_del{i}"):
                 tr.pop(i)
+                run_cfg["time_ranges"] = tr
+                save_run_state(run_cfg)
                 st.rerun()
         if st.button("添加时间段", key="run_tr_add"):
             tr.append(["18:00", "18:30"])
+            run_cfg["time_ranges"] = tr
+            save_run_state(run_cfg)
+            st.rerun()
 
         st.markdown("##### 路线")
         map_opts = {m["name"]: m["id"] for m in all_maps}
@@ -217,6 +277,7 @@ def show_run_page():
             st.caption(f"上次自动跑步: {last[:16]}")
 
     st.divider()
+    st.markdown("#### 跑步记录")
     if st.button("刷新", use_container_width=True, key="ref_rec"):
         st.session_state.records = api_call(run.get_run_records, 1, 10)
         st.rerun()
