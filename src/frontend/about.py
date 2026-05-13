@@ -5,13 +5,12 @@ def show_about_page():
     st.markdown("### 行迹 PaceTrace")
     st.markdown("校园跑管理工具")
     st.divider()
-    st.markdown(
-        """
-**授权协议**
+    st.markdown("""
+##### 授权协议
 
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
 
-**合理使用声明**
+##### 合理使用声明
 
 1. 本软件仅供个人学习、研究使用
 2. 使用者应遵守所在学校的校园跑相关规定
@@ -19,6 +18,13 @@ def show_about_page():
 4. 本软件不收集、上传任何用户个人信息
 5. 所有数据仅存储在用户本地设备
 
+##### 致谢
+
+- maps from yanyaoli/byerun-web([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)) and the repo's contributors.
+- core idea from <https://www.jysafe.cn/4707.air>
+- coding by opencode(DeepSeek v4 flash), claude(Sonnet 4.6), DeepSeek v4.
+- and **YOU**.
+
+---
 [GitHub](https://github.com/csy214-beep/PaceTrace) · [ISSUE](https://github.com/csy214-beep/PaceTrace/issues) · [PR](https://github.com/csy214-beep/PaceTrace/pulls)
-    """
-    )
+    """)

@@ -84,6 +84,12 @@ AMAP_SECURITY=your_amap_security_code
 
 This project is subject to the terms of all above licenses.
 
+## Thanks
+
+- maps from yanyaoli/byerun-web([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)) and the repo's contributors.
+- core idea from <https://www.jysafe.cn/4707.air>
+- coding by opencode(DeepSeek v4 flash), claude(Sonnet 4.6), DeepSeek v4.
+
 ## License
 
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
