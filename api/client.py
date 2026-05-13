@@ -6,10 +6,10 @@ from urllib.parse import urlencode, urlparse, parse_qs
 
 import requests
 
-APPKEY = "389885588s0648fa"
-APPSECRET = "56E39A1658455588885690425C0FD16055A21676"
-BASE_URL = "https://run-lb.tanmasports.com/"
-UA = "okhttp/3.10.0"
+APPKEY = os.environ["APPKEY"]
+APPSECRET = os.environ["APPSECRET"]
+BASE_URL = os.environ["BASE_URL"]
+UA = os.environ["UA"]
 
 _logger = logging.getLogger("unirun.api")
 _logger.setLevel(logging.DEBUG)

@@ -24,7 +24,8 @@ def show_club_page():
             status = "已加入" if joined else "未加入"
             st.markdown(
                 f"<div class='card'><div><b>{s.get('activityName')}</b> "
-                f"<span style='color:{'#2e7d32' if joined else '#888'}'>{status}</span></div>"
+                f"<span class='{'tag-ok' if joined else ''}' style='font-size:0.85rem;{'color:#2e7d32' if joined else 'color:#888'}'>"
+                f"{status}</span></div>"
                 f"<div class='card-sm'>{s.get('addressDetail')} | {s.get('weekDay')} "
                 f"{s.get('startTime')}-{s.get('endTime')} | 人数 {s.get('joinStudentNum')}/{s.get('studentNum')}</div></div>",
                 unsafe_allow_html=True,
