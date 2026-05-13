@@ -12,7 +12,7 @@ from datetime import datetime, date, timedelta
 from tray.tray import notify, update_menu as _update_menu
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".data")
-STATE_FILE = os.path.join(DATA_DIR, "scheduler.json")
+STATE_FILE = os.path.join(DATA_DIR, "scheduler_club.json")
 logger = logging.getLogger("scheduler")
 _lock = threading.Lock()
 

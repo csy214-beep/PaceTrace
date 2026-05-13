@@ -13,16 +13,18 @@ from frontend.utils import (
     draw_map_folium,
     AMAP_KEY,
 )
+from scheduler import load_run_state, save_run_state
 from tray.tray import notify
 
 
 def show_run_page():
+    all_map_list = list(all_maps)
+    if "custom_maps" in st.session_state:
+        all_map_list.extend(st.session_state.custom_maps)
+
     if not all_maps:
         st.info("maps 目录下没有路线文件")
     else:
-        all_map_list = list(all_maps)
-        if "custom_maps" in st.session_state:
-            all_map_list.extend(st.session_state.custom_maps)
         sel_name = st.selectbox("选择路线", [m["name"] for m in all_map_list], key="map_sel")
         sel_map = next(m for m in all_map_list if m["name"] == sel_name)
         full_dist = route_distance(sel_map["coords"])
@@ -124,17 +126,108 @@ def show_run_page():
                     st.error(f"提交失败: {r.get('msg', '未知错误')}")
                     notify("行迹", f"跑步提交失败: {r.get('msg', '未知错误')}")
 
+    # ── Run scheduler ──
     st.divider()
-    st.markdown("#### 跑步记录")
+    st.markdown("#### 定时跑步")
+
+    sched_key = "run_sched_enabled"
+    if sched_key not in st.session_state:
+        st.session_state[sched_key] = load_run_state().get("enabled", False)
+
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        if st.button(
+            "定时跑步 (开启)" if not st.session_state[sched_key]
+            else "定时跑步 (关闭)",
+            key="run_sched_toggle",
+            use_container_width=True,
+        ):
+            st.session_state[sched_key] = not st.session_state[sched_key]
+            cfg = load_run_state()
+            cfg["enabled"] = st.session_state[sched_key]
+            save_run_state(cfg)
+            st.rerun()
+    with c2:
+        if load_run_state().get("enabled", False):
+            st.success("运行中")
+        else:
+            st.caption("空闲")
+
+    if st.session_state[sched_key]:
+        st.warning("此功能需保持程序常驻后台运行，请勿在其它设备登录当前账号")
+
+    with st.expander("定时设置", expanded=st.session_state.get("_run_sched_expand", False)):
+        st.session_state._run_sched_expand = True
+        run_cfg = load_run_state()
+
+        st.markdown("##### 星期")
+        day_names = ["日", "一", "二", "三", "四", "五", "六"]
+        day_cols = st.columns(7)
+        days = list(run_cfg.get("days", [False]*7))
+        for i, (col, name) in enumerate(zip(day_cols, day_names)):
+            with col:
+                days[i] = st.checkbox(name, value=days[i], key=f"run_day_{i}")
+
+        st.markdown("##### 时间段")
+        tr = run_cfg.get("time_ranges", [])
+        for i, (start, end) in enumerate(tr):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            tr[i][0] = c1.text_input("起始", tr[i][0], key=f"run_tr_s{i}")
+            tr[i][1] = c2.text_input("结束", tr[i][1], key=f"run_tr_e{i}")
+            if c3.button("删除", key=f"run_tr_del{i}"):
+                tr.pop(i)
+                st.rerun()
+        if st.button("添加时间段", key="run_tr_add"):
+            tr.append(["18:00", "18:30"])
+
+        st.markdown("##### 路线")
+        map_opts = {m["name"]: m["id"] for m in all_maps}
+        if "custom_maps" in st.session_state:
+            for m in st.session_state.custom_maps:
+                map_opts[m["name"]] = m["id"]
+        cur_id = run_cfg.get("map", "")
+        cur_idx = 0
+        names = list(map_opts.keys())
+        for i, n in enumerate(names):
+            if map_opts[n] == cur_id:
+                cur_idx = i
+                break
+        sel_name = st.selectbox("选择路线", names, index=cur_idx, key="run_sched_map")
+
+        st.markdown("##### 目标")
+        c1, c2 = st.columns(2)
+        with c1:
+            d_min = st.number_input("最短距离(米)", 0, 10000, run_cfg.get("distance", {}).get("min", 2000), key="run_d_min")
+            s_min = st.number_input("最慢配速(km/h)", 1.0, 20.0, run_cfg.get("speed", {}).get("min", 5.0), key="run_s_min", step=0.5)
+        with c2:
+            d_max = st.number_input("最长距离(米)", 0, 10000, run_cfg.get("distance", {}).get("max", 5000), key="run_d_max")
+            s_max = st.number_input("最快配速(km/h)", 1.0, 20.0, run_cfg.get("speed", {}).get("max", 12.0), key="run_s_max", step=0.5)
+
+        if st.button("保存设置", key="run_sched_save", type="primary", use_container_width=True):
+            run_cfg["days"] = days
+            run_cfg["time_ranges"] = tr
+            run_cfg["map"] = map_opts.get(sel_name, "")
+            run_cfg["distance"] = {"min": d_min, "max": d_max}
+            run_cfg["speed"] = {"min": s_min, "max": s_max}
+            save_run_state(run_cfg)
+            st.success("设置已保存")
+
+        last = run_cfg.get("last_run")
+        if last:
+            st.caption(f"上次自动跑步: {last[:16]}")
+
+    st.divider()
     if st.button("刷新", use_container_width=True, key="ref_rec"):
         st.session_state.records = api_call(run.get_run_records, 1, 10)
         st.rerun()
+
     recs2 = st.session_state.records
     rl2 = recs2.get("response") if recs2 else []
-    if rl2:
-        for r in rl2:
-            st.markdown(
-                f"<div class='card'><div><b>{r.get('recordDate')}</b> {r.get('defeatedInfo')}</div>"
-                f"<div class='card-sm'>{r.get('runValidDistance')}m | {r.get('runValidTime')}min | {r.get('runSpeed')}m/min</div></div>",
-                unsafe_allow_html=True,
-            )
+    with st.expander(f"跑步记录 ({len(rl2)} 条)", expanded=False):
+        if rl2:
+            for r in rl2:
+                st.markdown(
+                    f"<div class='card'><div><b>{r.get('recordDate')}</b> {r.get('defeatedInfo')}</div>"
+                    f"<div class='card-sm'>{r.get('runValidDistance')}m | {r.get('runValidTime')}min | {r.get('runSpeed')}m/min</div></div>",
+                    unsafe_allow_html=True,
+                )

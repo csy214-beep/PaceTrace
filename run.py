@@ -52,27 +52,47 @@ def _start_tray():
 
 def _start_scheduler():
     try:
-        from scheduler import SignScheduler, load_state
+        from scheduler import SignScheduler, load_club_state
         sched = SignScheduler(interval=60)
         while True:
-            state = load_state()
+            state = load_club_state()
             if state.get("enabled", False):
                 if not sched.running:
-                    print("[scheduler] starting...")
+                    print("[scheduler] club: starting...")
                     sched.start()
             else:
                 if sched.running:
-                    print("[scheduler] stopping...")
+                    print("[scheduler] club: stopping...")
                     sched.stop()
             time.sleep(10)
     except Exception as e:
-        print(f"[scheduler] {e}")
+        print(f"[scheduler] club error: {e}")
+
+
+def _start_run_scheduler():
+    try:
+        from scheduler import RunScheduler, load_run_state
+        sched = RunScheduler(interval=120)
+        while True:
+            state = load_run_state()
+            if state.get("enabled", False):
+                if not sched.running:
+                    print("[scheduler] run: starting...")
+                    sched.start()
+            else:
+                if sched.running:
+                    print("[scheduler] run: stopping...")
+                    sched.stop()
+            time.sleep(10)
+    except Exception as e:
+        print(f"[scheduler] run error: {e}")
 
 
 if __name__ == "__main__":
     threading.Thread(target=_start_static_server, daemon=True).start()
     threading.Thread(target=_start_tray, daemon=True).start()
     threading.Thread(target=_start_scheduler, daemon=True).start()
+    threading.Thread(target=_start_run_scheduler, daemon=True).start()
 
     app = os.path.join(_SRC, "frontend", "app.py")
     os.system(f"streamlit run \"{app}\"")

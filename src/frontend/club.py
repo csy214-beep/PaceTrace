@@ -4,7 +4,7 @@ import streamlit as st
 
 from api import club
 from frontend.utils import api_call, get_activity_window, random_point_nearby
-from scheduler import SignScheduler, load_state, save_state
+from scheduler import load_club_state, save_club_state
 from tray.tray import notify
 
 
@@ -190,20 +190,23 @@ def show_club_page():
 
                 auto_key = "auto_sign_enabled"
                 if auto_key not in st.session_state:
-                    st.session_state[auto_key] = load_state().get("enabled", False)
+                    st.session_state[auto_key] = load_club_state().get("enabled", False)
 
                 c_auto1, c_auto2 = st.columns([2, 1])
                 with c_auto1:
                     if st.button(
-                        "自动签到/签退 (开启)" if not st.session_state[auto_key] else "自动签到/签退 (关闭)",
+                        "自动签到/签退 (开启)" if not st.session_state[auto_key]
+                        else "自动签到/签退 (关闭)",
                         key="auto_sign_toggle",
                         use_container_width=True,
                     ):
                         st.session_state[auto_key] = not st.session_state[auto_key]
-                        save_state({"enabled": st.session_state[auto_key]})
+                        cfg = load_club_state()
+                        cfg["enabled"] = st.session_state[auto_key]
+                        save_club_state(cfg)
                         st.rerun()
                 with c_auto2:
-                    if load_state().get("enabled", False):
+                    if load_club_state().get("enabled", False):
                         st.success("运行中")
                     else:
                         st.caption("每60秒检测一次")
