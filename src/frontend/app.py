@@ -3,6 +3,7 @@ import sys
 
 import streamlit as st
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def _load_env():
@@ -27,7 +28,23 @@ from frontend.about import show_about_page
 st.set_page_config(page_title="行迹", page_icon=None, layout="centered")
 
 with open(os.path.join(os.path.dirname(__file__), "style.css"), encoding="utf-8") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    css = f.read()
+
+# detect dark theme and append override
+try:
+    if st.get_option("theme.base") == "dark":
+        css += """
+        .card { background:#1e1e1e !important; border-color:#333 !important; }
+        .card-sm { color:#999 !important; }
+        .tag-ok { background:#1b3d1f !important; color:#66bb6a !important; }
+        .tag-full { background:#3d1b1b !important; color:#ef5350 !important; }
+        .tag-si { background:#1b2d3d !important; color:#42a5f5 !important; }
+        .tag-sb { background:#3d2d1b !important; color:#ffa726 !important; }
+        """
+except Exception:
+    pass
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 if "page" not in st.session_state:

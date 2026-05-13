@@ -8,7 +8,9 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from dotenv import load_dotenv
 
 _PDIR = os.path.dirname(os.path.abspath(__file__))
+_SRC = os.path.join(_PDIR, "src")
 sys.path.insert(0, _PDIR)
+sys.path.insert(0, _SRC)
 load_dotenv(os.path.join(_PDIR, ".env"))
 
 DRAWER_PORT = 8852
@@ -19,7 +21,7 @@ class DrawerHandler(SimpleHTTPRequestHandler):
         if self.path == "/drawer.html" or self.path.startswith("/drawer.html"):
             amap_key = os.environ.get("AMAP_KEY", "")
             amap_sec = os.environ.get("AMAP_SECURITY", "")
-            drawer_path = os.path.join(_PDIR, "frontend", "drawer.html")
+            drawer_path = os.path.join(_SRC, "frontend", "drawer.html")
             with open(drawer_path, encoding="utf-8") as f:
                 html = f.read()
             html = html.replace("{{AMAP_KEY}}", amap_key)
@@ -33,7 +35,7 @@ class DrawerHandler(SimpleHTTPRequestHandler):
 
 
 def _start_static_server():
-    os.chdir(os.path.join(_PDIR, "frontend"))
+    os.chdir(os.path.join(_SRC, "frontend"))
     server = HTTPServer(("127.0.0.1", DRAWER_PORT), DrawerHandler)
     print(f"[static] drawer at http://127.0.0.1:{DRAWER_PORT}/drawer.html")
     server.serve_forever()
@@ -72,7 +74,7 @@ if __name__ == "__main__":
     threading.Thread(target=_start_tray, daemon=True).start()
     threading.Thread(target=_start_scheduler, daemon=True).start()
 
-    app = os.path.join(_PDIR, "frontend", "app.py")
+    app = os.path.join(_SRC, "frontend", "app.py")
     os.system(f"streamlit run \"{app}\"")
 
     print("[scheduler] web ui closed, scheduler keeps running in background")

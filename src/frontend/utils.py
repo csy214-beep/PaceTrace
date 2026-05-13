@@ -30,7 +30,7 @@ def api_call(func, *args, **kwargs):
         return None
 
 
-MAPS_DIR = os.path.join(os.path.dirname(__file__), "..", "maps")
+MAPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "maps")
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
 

@@ -31,16 +31,19 @@ Open `http://localhost:8501` in your browser.
 
 ```bash
 git pull origin main
-python -m venv .venv          # skip if already exists
 .venv\Scripts\activate        # or source .venv/bin/activate
 pip install -r requirements.txt --upgrade
 ```
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in your AMap credentials (optional, required for map preview and track drawer):
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```
+APPKEY=your_api_appkey
+APPSECRET=your_api_secret
+BASE_URL=https://run-lb.tanmasports.com/
+UA=okhttp/3.10.0
 AMAP_KEY=your_amap_js_api_key
 AMAP_SECURITY=your_amap_security_code
 ```
@@ -49,21 +52,18 @@ AMAP_SECURITY=your_amap_security_code
 
 ```
 .
-├── api/              # API client library
-├── frontend/         # Streamlit web UI
-├── scheduler/        # Background scheduler module
-├── tray/             # System tray module
-├── maps/             # Built-in route data (JSON)
-├── .data/            # Local data (token, user, logs)
+├── .data/            # Local data (token, user, logs, scheduler state)
+├── src/
+│   ├── api/          # API client library
+│   ├── frontend/     # Streamlit web UI
+│   ├── maps/         # Built-in route data (JSON)
+│   ├── scheduler/    # Background scheduler module
+│   └── tray/         # System tray module
+├── scripts/          # Startup scripts (bat/sh)
 ├── run.py            # Application entry point
-└── .env              # Environment configuration
+├── .env              # Environment configuration
+└── requirements.txt
 ```
-
-## Thanks
-
-- maps from yanyaoli/byerun-web and the repo's contributors. (CC BY-NC 4.0)
-- core idea from <https://www.jysafe.cn/4707.air>
-- coding by opencode.
 
 ## License
 

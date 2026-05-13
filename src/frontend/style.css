@@ -15,10 +15,7 @@ div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
     margin-bottom: 0.5rem;
     border: 1px solid #eee;
 }
-.card-sm {
-    font-size: 0.85rem;
-    color: #666;
-}
+.card-sm { font-size: 0.85rem; color: #666; }
 
 /* tags */
 .tag-ok { background: #e8f5e9; color: #2e7d32; border-radius: 10px; padding: 1px 8px; font-size: 0.75rem; }
@@ -26,27 +23,12 @@ div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
 .tag-si { background: #e3f2fd; color: #1565c0; border-radius: 10px; padding: 1px 8px; font-size: 0.75rem; }
 .tag-sb { background: #fff3e0; color: #e65100; border-radius: 10px; padding: 1px 8px; font-size: 0.75rem; }
 
-/* dark theme */
-[data-theme="dark"] .card {
-    background: #1e1e1e !important;
-    border-color: #333 !important;
-}
-[data-theme="dark"] .card-sm {
-    color: #999 !important;
-}
-[data-theme="dark"] .tag-ok {
-    background: #1b3d1f !important;
-    color: #66bb6a !important;
-}
-[data-theme="dark"] .tag-full {
-    background: #3d1b1b !important;
-    color: #ef5350 !important;
-}
-[data-theme="dark"] .tag-si {
-    background: #1b2d3d !important;
-    color: #42a5f5 !important;
-}
-[data-theme="dark"] .tag-sb {
-    background: #3d2d1b !important;
-    color: #ffa726 !important;
+/* dark theme fallback via media query */
+@media (prefers-color-scheme: dark) {
+    .card { background: #1e1e1e !important; border-color: #333 !important; }
+    .card-sm { color: #999 !important; }
+    .tag-ok { background: #1b3d1f !important; color: #66bb6a !important; }
+    .tag-full { background: #3d1b1b !important; color: #ef5350 !important; }
+    .tag-si { background: #1b2d3d !important; color: #42a5f5 !important; }
+    .tag-sb { background: #3d2d1b !important; color: #ffa726 !important; }
 }

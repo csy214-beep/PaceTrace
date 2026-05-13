@@ -12,7 +12,7 @@ logger = logging.getLogger("tray")
 
 _OPEN_URL = "http://localhost:8501"
 _STATE_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     ".data", "scheduler.json",
 )
 _icon: pystray.Icon | None = None
