@@ -1,17 +1,18 @@
 # PaceTrace
 
-A campus run management dashboard with club activity support, auto sign-in scheduler, and an AMap-based track drawer.
+A campus run management dashboard with club activity support, auto sign-in/run schedulers, and an AMap-based track drawer.
 
 ## Features
 
 - **Authentication** — login with phone number and password; token persists locally.
 - **Dashboard** — overview of run stats (valid days, distance, pace) and recent records.
-- **Campus Run** — select a route from built-in maps, set distance and duration, preview the track on a map, and submit run records.
+- **Campus Run** — select a route from built-in maps, set distance and duration, preview the track on a map, submit run records, and view history.
+- **Auto Run Scheduler** — schedule automatic run submissions by day of week, time range, route, distance, and pace range.
 - **Club Activities** — browse semester projects, register/cancel activities, sign in/back with GPS check-in.
-- **Auto Sign-In/Back** — background scheduler that detects activity time windows and performs sign-in/back automatically at the right moment.
-- **Track Drawer** *(requires AMap key)* — a standalone browser-based tool for drawing custom running routes on an AMap-powered map. Supports continuous freehand drawing, single-point placement, undo, export/import JSON files.
+- **Auto Sign-In/Back** — background scheduler that detects activity time windows and performs sign-in/back automatically.
+- **Track Drawer** *(requires AMap key)* — standalone browser-based tool for drawing custom running routes on an AMap map. Supports continuous freehand and single-point drawing, undo, path length display, and JSON export/import.
 - **System Tray** — background tray icon showing scheduler status, with quick launch and exit.
-- **Operation Log** — all API requests and scheduler actions are logged locally to `.data/app.log`.
+- **Operation Log** — all API requests and scheduler actions logged to `.data/app.log`.
 
 ## Quick Start
 
@@ -52,12 +53,12 @@ AMAP_SECURITY=your_amap_security_code
 
 ```
 .
-├── .data/            # Local data (token, user, logs, scheduler state)
+├── .data/            # Local data (token, user, logs, scheduler states)
 ├── src/
 │   ├── api/          # API client library
-│   ├── frontend/     # Streamlit web UI
+│   ├── frontend/     # Streamlit web UI (pages, utils, styles)
 │   ├── maps/         # Built-in route data (JSON)
-│   ├── scheduler/    # Background scheduler module
+│   ├── scheduler/    # Background scheduler (club + run)
 │   └── tray/         # System tray module
 ├── scripts/          # Startup scripts (bat/sh)
 ├── run.py            # Application entry point
