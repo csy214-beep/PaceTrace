@@ -1,5 +1,10 @@
 # PaceTrace
 
+![GitHub Repo stars](https://img.shields.io/github/stars/csy214-beep/PaceTrace?style=social)
+![GitHub forks](https://img.shields.io/github/forks/csy214-beep/PaceTrace?style=social)
+![GitHub issues](https://img.shields.io/github/issues/csy214-beep/PaceTrace?style=social)
+[![Sync to Gitee](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml/badge.svg?branch=main)](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml)
+
 A campus run management dashboard with club activity support, auto sign-in/run schedulers, and an AMap-based track drawer.
 
 ## Features
@@ -65,6 +70,20 @@ AMAP_SECURITY=your_amap_security_code
 ├── .env              # Environment configuration
 └── requirements.txt
 ```
+
+## Dependencies
+
+| Library | Version | License | Purpose |
+|---------|---------|---------|---------|
+| streamlit | 1.57.0 | Apache 2.0 | Web UI framework |
+| requests | 2.34.0 | Apache 2.0 | HTTP client for API calls |
+| folium | 0.20.0 | MIT | Interactive route maps |
+| pystray | 0.19.5 | LGPL-3.0 | System tray icon |
+| Pillow | 12.2.0 | Historical | Tray icon rendering |
+| python-dotenv | 1.2.2 | BSD 3-Clause | Environment config loading |
+| tqdm | 4.67.3 | MPL-2.0 | Download progress bar (installer) |
+
+This project is subject to the terms of all above licenses.
 
 ## License
 

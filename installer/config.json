@@ -1,0 +1,10 @@
+{
+    "repo_url": "https://gitee.com/Pfolg/PaceTrace.git",
+    "branch": "main",
+    "python_version": "3.11",
+    "min_python_version": [
+        3,
+        10
+    ],
+    "project_dir": "PaceTrace"
+}
