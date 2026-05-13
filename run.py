@@ -8,8 +8,28 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from dotenv import load_dotenv
 
 _PDIR = os.path.dirname(os.path.abspath(__file__))
+_SRC = os.path.join(_PDIR, "src")
 sys.path.insert(0, _PDIR)
-load_dotenv(os.path.join(_PDIR, ".env"))
+sys.path.insert(0, _SRC)
+
+if os.name == "nt":
+    _VENV_PY = os.path.join(_PDIR, ".venv", "Scripts", "python.exe")
+else:
+    _VENV_PY = os.path.join(_PDIR, ".venv", "bin", "python")
+if not os.path.exists(_VENV_PY):
+    _VENV_PY = sys.executable
+
+_env_path = os.path.join(_PDIR, ".env")
+if not os.path.exists(_env_path) and getattr(sys, 'frozen', False):
+    _env_path = os.path.join(os.path.dirname(sys.executable), ".env")
+load_dotenv(_env_path)
+
+# configure file logging for API calls from background threads
+try:
+    from frontend.logger import init_logging
+    init_logging()
+except Exception:
+    pass
 
 DRAWER_PORT = 8852
 
@@ -19,7 +39,7 @@ class DrawerHandler(SimpleHTTPRequestHandler):
         if self.path == "/drawer.html" or self.path.startswith("/drawer.html"):
             amap_key = os.environ.get("AMAP_KEY", "")
             amap_sec = os.environ.get("AMAP_SECURITY", "")
-            drawer_path = os.path.join(_PDIR, "frontend", "drawer.html")
+            drawer_path = os.path.join(_SRC, "frontend", "drawer.html")
             with open(drawer_path, encoding="utf-8") as f:
                 html = f.read()
             html = html.replace("{{AMAP_KEY}}", amap_key)
@@ -33,7 +53,7 @@ class DrawerHandler(SimpleHTTPRequestHandler):
 
 
 def _start_static_server():
-    os.chdir(os.path.join(_PDIR, "frontend"))
+    os.chdir(os.path.join(_SRC, "frontend"))
     server = HTTPServer(("127.0.0.1", DRAWER_PORT), DrawerHandler)
     print(f"[static] drawer at http://127.0.0.1:{DRAWER_PORT}/drawer.html")
     server.serve_forever()
@@ -50,30 +70,58 @@ def _start_tray():
 
 def _start_scheduler():
     try:
-        from scheduler import SignScheduler, load_state
+        from scheduler import SignScheduler, load_club_state
         sched = SignScheduler(interval=60)
         while True:
-            state = load_state()
+            state = load_club_state()
             if state.get("enabled", False):
                 if not sched.running:
-                    print("[scheduler] starting...")
+                    print("[scheduler] club: starting...")
                     sched.start()
             else:
                 if sched.running:
-                    print("[scheduler] stopping...")
+                    print("[scheduler] club: stopping...")
                     sched.stop()
             time.sleep(10)
     except Exception as e:
-        print(f"[scheduler] {e}")
+        print(f"[scheduler] club error: {e}")
+
+
+def _start_run_scheduler():
+    try:
+        from scheduler import RunScheduler, load_run_state
+        sched = RunScheduler(interval=120)
+        while True:
+            state = load_run_state()
+            if state.get("enabled", False):
+                if not sched.running:
+                    print("[scheduler] run: starting...")
+                    sched.start()
+            else:
+                if sched.running:
+                    print("[scheduler] run: stopping...")
+                    sched.stop()
+            time.sleep(10)
+    except Exception as e:
+        print(f"[scheduler] run error: {e}")
 
 
 if __name__ == "__main__":
     threading.Thread(target=_start_static_server, daemon=True).start()
     threading.Thread(target=_start_tray, daemon=True).start()
     threading.Thread(target=_start_scheduler, daemon=True).start()
+    threading.Thread(target=_start_run_scheduler, daemon=True).start()
 
-    app = os.path.join(_PDIR, "frontend", "app.py")
-    os.system(f"streamlit run \"{app}\"")
+    app = os.path.join(_SRC, "frontend", "app.py")
+    if getattr(sys, 'frozen', False):
+        from streamlit.web import cli as stcli
+        sys.argv = ["streamlit", "run", app]
+        try:
+            stcli.main()
+        except (SystemExit, KeyboardInterrupt):
+            pass
+    else:
+        os.system(f"streamlit run \"{app}\"")
 
     print("[scheduler] web ui closed, scheduler keeps running in background")
     print("[scheduler] press Ctrl+C or use tray menu to exit")

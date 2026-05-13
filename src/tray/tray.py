@@ -12,8 +12,12 @@ logger = logging.getLogger("tray")
 
 _OPEN_URL = "http://localhost:8501"
 _STATE_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    ".data", "scheduler.json",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    ".data", "scheduler_club.json",
+)
+_RUN_STATE_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    ".data", "scheduler_run.json",
 )
 _icon: pystray.Icon | None = None
 _lock = threading.Lock()
@@ -34,6 +38,15 @@ def _create_icon_image(size=64):
 def _scheduler_status():
     try:
         with open(_STATE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return "已开启" if data.get("enabled") else "已关闭"
+    except Exception:
+        return "未知"
+
+
+def _run_scheduler_status():
+    try:
+        with open(_RUN_STATE_FILE, encoding="utf-8") as f:
             data = json.load(f)
         return "已开启" if data.get("enabled") else "已关闭"
     except Exception:
@@ -88,7 +101,12 @@ class TrayApp:
             pystray.MenuItem("显示窗口", self._on_show, default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                lambda item: f"定时任务: {_scheduler_status()}",
+                lambda item: f"俱乐部定时: {_scheduler_status()}",
+                lambda: None,
+                enabled=False,
+            ),
+            pystray.MenuItem(
+                lambda item: f"跑步定时: {_run_scheduler_status()}",
                 lambda: None,
                 enabled=False,
             ),

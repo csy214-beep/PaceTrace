@@ -1,6 +1,6 @@
 .venv
 .streamlit
-tanma.unirun
+java
 *.zip
 __pycache__
 .token
@@ -8,4 +8,8 @@ __pycache__
 .user
 .env
 .data
-amap-coordinate-picking
+amap
+*.spec
+dist
+build
+.installed_ver

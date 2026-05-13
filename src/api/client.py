@@ -6,17 +6,17 @@ from urllib.parse import urlencode, urlparse, parse_qs
 
 import requests
 
-APPKEY = "389885588s0648fa"
-APPSECRET = "56E39A1658455588885690425C0FD16055A21676"
-BASE_URL = "https://run-lb.tanmasports.com/"
-UA = "okhttp/3.10.0"
+APPKEY = os.environ["APPKEY"]
+APPSECRET = os.environ["APPSECRET"]
+BASE_URL = os.environ["BASE_URL"]
+UA = os.environ["UA"]
 
 _logger = logging.getLogger("unirun.api")
 _logger.setLevel(logging.DEBUG)
 
 _token = ""
 _session = requests.Session()
-_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
+_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".data")
 os.makedirs(_config_dir, exist_ok=True)
 
 
@@ -80,7 +80,7 @@ def _request(method: str, path: str, params: dict = None, body: dict = None) -> 
 
     _logger.info(">> %s %s", method, url)
     if body_str:
-        _logger.debug("   body: %s", body_str[:200])
+        _logger.info("   body: %s", body_str[:500])
 
     if body_str:
         headers["Content-Type"] = "application/json; charset=UTF-8"
@@ -93,11 +93,11 @@ def _request(method: str, path: str, params: dict = None, body: dict = None) -> 
         code = data.get("code")
         msg = data.get("msg", "")
         _logger.info("<< %s status=%s code=%s msg=%s", method, r.status_code, code, msg)
-        if data.get("response") is not None:
-            _logger.debug("   response: %s", json.dumps(data["response"], ensure_ascii=False)[:300])
+        resp_str = json.dumps(data["response"], ensure_ascii=False) if data.get("response") is not None else "null"
+        _logger.info("   response: %s", resp_str[:500])
         return data
     except Exception:
-        _logger.warning("<< %s status=%s not json: %s", method, r.status_code, r.text[:200])
+        _logger.warning("<< %s status=%s not json: %s", method, r.status_code, r.text[:500])
         raise
 
 

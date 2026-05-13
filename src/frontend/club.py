@@ -4,14 +4,12 @@ import streamlit as st
 
 from api import club
 from frontend.utils import api_call, get_activity_window, random_point_nearby
-from scheduler import SignScheduler, load_state, save_state
+from scheduler import load_club_state, save_club_state
 from tray.tray import notify
-
+from frontend.logger import logger
 
 def get_sign_status(a, sd, cur_aid):
-    if a["clubActivityId"] == cur_aid:
-        return sd.get("signStatus") == "1"
-    return a.get("signStatus") == "1"
+    return a["clubActivityId"] == cur_aid and sd.get("signStatus") == "1"
 
 
 def show_club_page():
@@ -24,7 +22,8 @@ def show_club_page():
             status = "已加入" if joined else "未加入"
             st.markdown(
                 f"<div class='card'><div><b>{s.get('activityName')}</b> "
-                f"<span style='color:{'#2e7d32' if joined else '#888'}'>{status}</span></div>"
+                f"<span class='{'tag-ok' if joined else ''}' style='font-size:0.85rem;{'color:#2e7d32' if joined else 'color:#888'}'>"
+                f"{status}</span></div>"
                 f"<div class='card-sm'>{s.get('addressDetail')} | {s.get('weekDay')} "
                 f"{s.get('startTime')}-{s.get('endTime')} | 人数 {s.get('joinStudentNum')}/{s.get('studentNum')}</div></div>",
                 unsafe_allow_html=True,
@@ -122,13 +121,17 @@ def show_club_page():
                         r = api_call(club.join_activity, activity_id=a["clubActivityId"])
                         if r:
                             resp_data = r.get("response") or {}
-                            if r.get("code") == 10000 and resp_data.get("status") != "0":
+                            ok = r.get("code") == 10000
+                            if isinstance(resp_data, dict):
+                                ok = ok and resp_data.get("status") != "0"
+                            if ok:
                                 st.success("报名成功")
                                 notify("行迹", f"报名成功: {a.get('activityName')}")
                                 st.session_state.my_acts = api_call(club.get_my_activities)
                                 st.rerun()
                             else:
-                                msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                msg = msg or r.get("msg", "未知错误")
                                 st.error(f"报名失败: {msg}")
                                 notify("行迹", f"报名失败: {msg}")
                 if already:
@@ -140,13 +143,17 @@ def show_club_page():
                         r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
                         if r:
                             resp_data = r.get("response") or {}
-                            if r.get("code") == 10000 and resp_data.get("status") != "0":
+                            ok = r.get("code") == 10000
+                            if isinstance(resp_data, dict):
+                                ok = ok and resp_data.get("status") != "0"
+                            if ok:
                                 st.success("已取消")
                                 notify("行迹", f"已取消报名: {a.get('activityName')}")
                                 st.session_state.my_acts = api_call(club.get_my_activities)
                                 st.rerun()
                             else:
-                                msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                msg = msg or r.get("msg", "未知错误")
                                 st.error(f"取消失败: {msg}")
                                 notify("行迹", f"取消失败: {msg}")
         else:
@@ -158,7 +165,7 @@ def show_club_page():
                     st.info("该日期暂无活动，请换一天试试")
 
     st.divider()
-    st.markdown("#### 需处理的活动")
+    st.markdown("#### 我的活动")
 
     st.session_state.my_acts = api_call(club.get_my_activities)
     mya = st.session_state.my_acts
@@ -189,20 +196,23 @@ def show_club_page():
 
                 auto_key = "auto_sign_enabled"
                 if auto_key not in st.session_state:
-                    st.session_state[auto_key] = load_state().get("enabled", False)
+                    st.session_state[auto_key] = load_club_state().get("enabled", False)
 
                 c_auto1, c_auto2 = st.columns([2, 1])
                 with c_auto1:
                     if st.button(
-                        "自动签到/签退 (开启)" if not st.session_state[auto_key] else "自动签到/签退 (关闭)",
+                        "自动签到/签退 (开启)" if not st.session_state[auto_key]
+                        else "自动签到/签退 (关闭)",
                         key="auto_sign_toggle",
                         use_container_width=True,
                     ):
                         st.session_state[auto_key] = not st.session_state[auto_key]
-                        save_state({"enabled": st.session_state[auto_key]})
+                        cfg = load_club_state()
+                        cfg["enabled"] = st.session_state[auto_key]
+                        save_club_state(cfg)
                         st.rerun()
                 with c_auto2:
-                    if load_state().get("enabled", False):
+                    if load_club_state().get("enabled", False):
                         st.success("运行中")
                     else:
                         st.caption("每60秒检测一次")
@@ -235,50 +245,54 @@ def show_club_page():
                     start_str = a.get("startTime", "")
                     end_str = a.get("endTime", "")
                     start_dt, end_dt = get_activity_window(mmdd, start_str, end_str)
-                    window_status = "inside"
-                    if start_dt and now < start_dt:
-                        window_status = "before"
-                    elif end_dt and now > end_dt:
-                        window_status = "after"
-
-                    if window_status == "before":
-                        st.caption(f"活动未开始，预计 {start_dt.strftime('%m-%d %H:%M')} 开始")
-                        continue
-                    elif window_status == "after":
-                        st.caption("活动已结束")
-                        continue
 
                     c1, c2 = st.columns([3, 1])
-                    has_ll = bool(sd.get("latitude") and sd.get("longitude"))
-                    if is_cur and has_ll:
-                        lat_v, lng_v = random_point_nearby(sd["latitude"], sd["longitude"], 100)
+                    if sd.get("latitude") and sd.get("longitude"):
+                        lat_v, lng_v = random_point_nearby(
+                            sd["latitude"], sd["longitude"], 200
+                        )
                     else:
                         lat_v, lng_v = None, None
-                    if not has_ll:
-                        st.caption("坐标数据缺失，签到暂时不可用")
                     with c1:
-                        if st.button(label, key=k, use_container_width=True, type="primary"):
-                            if not lat_v or not lng_v:
-                                st.error("签到失败: 无法获取活动坐标")
-                            else:
-                                r = api_call(
-                                    club.sign_in_or_back,
-                                    a["clubActivityId"],
-                                    lat_v,
-                                    lng_v,
-                                    "1" if label == "签到" else "2",
+                        if not lat_v or not lng_v:
+                            st.caption("坐标数据缺失，暂时无法操作")
+                        elif st.button(
+                            label, key=k, use_container_width=True, type="primary"
+                        ):
+                            r = api_call(
+                                club.sign_in_or_back,
+                                a["clubActivityId"],
+                                lat_v,
+                                lng_v,
+                                "1" if label == "签到" else "2",
+                            )
+                            if r:
+                                resp_data = r.get("response") or {}
+                                msg = (
+                                    resp_data.get("message", "")
+                                    if isinstance(resp_data, dict)
+                                    else str(resp_data)
                                 )
-                                if r:
-                                    resp_data = r.get("response") or {}
-                                    msg = resp_data.get("message") or r.get("msg", "未知错误")
-                                    if r.get("code") == 10000:
-                                        st.success(f"{label}成功")
-                                        notify("行迹", f"{label}成功")
-                                    else:
-                                        st.error(f"{label}失败: {msg}")
-                                        notify("行迹", f"{label}失败: {msg}")
-                                    if r.get("code") == 10000:
-                                        st.rerun()
+                                msg = msg or r.get("msg", "未知错误")
+                                if r.get("code") == 10000:
+                                    st.success(f"{label}成功")
+                                    notify("行迹", f"{label}成功")
+                                    logger.info(
+                                        "%s成功: activity=%s",
+                                        label,
+                                        a["clubActivityId"],
+                                    )
+                                else:
+                                    st.error(f"{label}失败: {msg}")
+                                    notify("行迹", f"{label}失败: {msg}")
+                                    logger.warning(
+                                        "%s失败: activity=%s msg=%s",
+                                        label,
+                                        a["clubActivityId"],
+                                        msg,
+                                    )
+                                if r.get("code") == 10000:
+                                    st.rerun()
                     with c2:
                         if st.button(
                             "取消报名",
@@ -288,12 +302,16 @@ def show_club_page():
                             r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
                             if r:
                                 resp_data = r.get("response") or {}
-                                if r.get("code") == 10000 and resp_data.get("status") != "0":
+                                ok = r.get("code") == 10000
+                                if isinstance(resp_data, dict):
+                                    ok = ok and resp_data.get("status") != "0"
+                                if ok:
                                     st.success("已取消")
                                     notify("行迹", "报名已取消")
                                     st.rerun()
                                 else:
-                                    msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                    msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                    msg = msg or r.get("msg", "未知错误")
                                     st.error(f"取消失败: {msg}")
             if history:
                 with st.expander(f"历史记录 ({len(history)} 条)"):

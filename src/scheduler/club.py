@@ -11,8 +11,8 @@ from datetime import datetime, date, timedelta
 
 from tray.tray import notify, update_menu as _update_menu
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
-STATE_FILE = os.path.join(DATA_DIR, "scheduler.json")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".data")
+STATE_FILE = os.path.join(DATA_DIR, "scheduler_club.json")
 logger = logging.getLogger("scheduler")
 _lock = threading.Lock()
 
@@ -235,7 +235,7 @@ class SignScheduler:
             logger.info("tick: missing data (aid=%s lat=%s lng=%s)", aid, lat, lng)
             return
 
-        lat_r, lng_r = _random_point(lat, lng, 100)
+        lat_r, lng_r = _random_point(lat, lng, 200)
 
         if status == "0":
             # 未签到 → 签到

@@ -1,17 +1,23 @@
 # PaceTrace
 
-A campus run management dashboard with club activity support, auto sign-in scheduler, and an AMap-based track drawer.
+![GitHub Repo stars](https://img.shields.io/github/stars/csy214-beep/PaceTrace?style=social)
+![GitHub forks](https://img.shields.io/github/forks/csy214-beep/PaceTrace?style=social)
+![GitHub issues](https://img.shields.io/github/issues/csy214-beep/PaceTrace?style=social)
+[![Sync to Gitee](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml/badge.svg?branch=main)](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml)
+
+A campus run management dashboard with club activity support, auto sign-in/run schedulers, and an AMap-based track drawer.
 
 ## Features
 
 - **Authentication** — login with phone number and password; token persists locally.
 - **Dashboard** — overview of run stats (valid days, distance, pace) and recent records.
-- **Campus Run** — select a route from built-in maps, set distance and duration, preview the track on a map, and submit run records.
+- **Campus Run** — select a route from built-in maps, set distance and duration, preview the track on a map, submit run records, and view history.
+- **Auto Run Scheduler** — schedule automatic run submissions by day of week, time range, route, distance, and pace range.
 - **Club Activities** — browse semester projects, register/cancel activities, sign in/back with GPS check-in.
-- **Auto Sign-In/Back** — background scheduler that detects activity time windows and performs sign-in/back automatically at the right moment.
-- **Track Drawer** *(requires AMap key)* — a standalone browser-based tool for drawing custom running routes on an AMap-powered map. Supports continuous freehand drawing, single-point placement, undo, export/import JSON files.
+- **Auto Sign-In/Back** — background scheduler that detects activity time windows and performs sign-in/back automatically.
+- **Track Drawer** *(requires AMap key)* — standalone browser-based tool for drawing custom running routes on an AMap map. Supports continuous freehand and single-point drawing, undo, path length display, and JSON export/import.
 - **System Tray** — background tray icon showing scheduler status, with quick launch and exit.
-- **Operation Log** — all API requests and scheduler actions are logged locally to `.data/app.log`.
+- **Operation Log** — all API requests and scheduler actions logged to `.data/app.log`.
 
 ## Quick Start
 
@@ -31,16 +37,19 @@ Open `http://localhost:8501` in your browser.
 
 ```bash
 git pull origin main
-python -m venv .venv          # skip if already exists
 .venv\Scripts\activate        # or source .venv/bin/activate
 pip install -r requirements.txt --upgrade
 ```
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in your AMap credentials (optional, required for map preview and track drawer):
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```
+APPKEY=your_api_appkey
+APPSECRET=your_api_secret
+BASE_URL=https://run-lb.tanmasports.com/
+UA=okhttp/3.10.0
 AMAP_KEY=your_amap_js_api_key
 AMAP_SECURITY=your_amap_security_code
 ```
@@ -49,21 +58,32 @@ AMAP_SECURITY=your_amap_security_code
 
 ```
 .
-├── api/              # API client library
-├── frontend/         # Streamlit web UI
-├── scheduler/        # Background scheduler module
-├── tray/             # System tray module
-├── maps/             # Built-in route data (JSON)
-├── .data/            # Local data (token, user, logs)
+├── .data/            # Local data (token, user, logs, scheduler states)
+├── src/
+│   ├── api/          # API client library
+│   ├── frontend/     # Streamlit web UI (pages, utils, styles)
+│   ├── maps/         # Built-in route data (JSON)
+│   ├── scheduler/    # Background scheduler (club + run)
+│   └── tray/         # System tray module
+├── scripts/          # Startup scripts (bat/sh)
 ├── run.py            # Application entry point
-└── .env              # Environment configuration
+├── .env              # Environment configuration
+└── requirements.txt
 ```
 
-## Thanks
+## Dependencies
 
-- maps from yanyaoli/byerun-web and the repo's contributors. (CC BY-NC 4.0)
-- core idea from <https://www.jysafe.cn/4707.air>
-- coding by opencode.
+| Library | Version | License | Purpose |
+|---------|---------|---------|---------|
+| streamlit | 1.57.0 | Apache 2.0 | Web UI framework |
+| requests | 2.34.0 | Apache 2.0 | HTTP client for API calls |
+| folium | 0.20.0 | MIT | Interactive route maps |
+| pystray | 0.19.5 | LGPL-3.0 | System tray icon |
+| Pillow | 12.2.0 | Historical | Tray icon rendering |
+| python-dotenv | 1.2.2 | BSD 3-Clause | Environment config loading |
+| tqdm | 4.67.3 | MPL-2.0 | Download progress bar (installer) |
+
+This project is subject to the terms of all above licenses.
 
 ## License
 

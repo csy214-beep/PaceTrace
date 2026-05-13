@@ -1,11 +1,23 @@
 """
 行迹 PaceTrace API 交互式测试
-
-所有文件仅保存于当前项目目录 (api/.token, api/.user)。
-登录后用户信息自动填充到内存 ctx.user，后续请求自动取用。
 """
-
 import json
+import os
+import sys
+
+_PDIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _PDIR)
+sys.path.insert(0, os.path.join(_PDIR, "src"))
+
+# load .env before api imports
+_env_path = os.path.join(_PDIR, ".env")
+if os.path.exists(_env_path):
+    for line in open(_env_path, encoding="utf-8"):
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ[k.strip()] = v.strip()
+
 from api import auth, run, club, ctx
 
 
@@ -118,6 +130,30 @@ def cmd_sign_in_tf():
     pp(club.get_sign_in_tf())
 
 
+def cmd_check_coords():
+    """检查 get_sign_in_tf 返回的坐标信息"""
+    tf = club.get_sign_in_tf()
+    pp(tf)
+    data = tf.get("response") or {}
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    aid = data.get("activityId")
+    status = data.get("signStatus")
+    print(f"\n活动ID: {aid}")
+    print(f"签到状态: {status}")
+    print(f"纬度: {lat or '(无)'}")
+    print(f"经度: {lng or '(无)'}")
+    if lat and lng:
+        from api.club import sign_in_or_back
+        from frontend.utils import random_point_nearby
+        lat_r, lng_r = random_point_nearby(lat, lng, 100)
+        print(f"\n随机签到点: {lat_r}, {lng_r}")
+        r = input("\n是否用此坐标签到? (y/n): ").strip().lower()
+        if r == "y":
+            t = "2" if status == "1" else "1"
+            pp(sign_in_or_back(aid, lat_r, lng_r, t))
+
+
 def cmd_club_records():
     pp(club.get_club_records())
 
@@ -219,6 +255,7 @@ def main():
         ("22", "首页俱乐部", cmd_home_club),
         ("23", "俱乐部横幅", cmd_club_banner),
         ("24", "签到状态", cmd_sign_in_tf),
+        ("24a", "签到坐标检测", cmd_check_coords),
         ("25", "签到/签退", cmd_sign),
         ("26", "打卡记录", cmd_club_records),
         ("27", "我的活动", cmd_my_activities),

@@ -1,13 +1,8 @@
-"""登录 / 注册 / 用户信息"""
 from . import client
 from .context import ctx
 
 
 def login(phone: str, password: str) -> dict:
-    """密码登录（密码自动 MD5 哈希）
-
-    成功后 ctx.user 自动填充，token 自动保存。
-    """
     pwd_hashed = client.md5(password.strip())
     body = {
         "appVersions": "1.8.5",
@@ -26,7 +21,6 @@ def login(phone: str, password: str) -> dict:
 
 
 def login_by_token() -> dict:
-    """用已保存的 token 重新登录"""
     resp = client.get("v1/auth/login/token")
     if resp.get("code") in (200, 10000) and resp.get("response"):
         ctx.save_user(resp["response"])
@@ -34,17 +28,14 @@ def login_by_token() -> dict:
 
 
 def get_user_info() -> dict:
-    """查询当前用户信息"""
     return client.get("v1/auth/query/token")
 
 
 def logout():
-    """清除本地用户信息"""
     ctx.clear()
 
 
 def get_schools() -> dict:
-    """获取学校列表"""
     return client.get("v1/school/getSchoolSingleInfoList")
 
 

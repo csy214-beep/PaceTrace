@@ -3,6 +3,7 @@ import sys
 
 import streamlit as st
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def _load_env():
@@ -26,23 +27,24 @@ from frontend.about import show_about_page
 
 st.set_page_config(page_title="行迹", page_icon=None, layout="centered")
 
-st.markdown("""
-<style>
-    #MainMenu, footer { display: none; }
-    .block-container { padding-top: 3.5rem; max-width: 720px; }
-    section[data-testid="stSidebar"] { width: 220px !important; min-width: 220px !important; }
-    section[data-testid="stSidebar"] .block-container { padding: 0.8rem; }
-    section[data-testid="stSidebar"] hr { margin: 0.4rem 0; }
-    .card { background:#fafafa; border-radius:10px; padding:0.8rem; margin-bottom:0.5rem; border:1px solid #eee; }
-    .card-sm { font-size:0.85rem; color:#666; }
-    .tag-ok { background:#e8f5e9; color:#2e7d32; border-radius:10px; padding:1px 8px; font-size:0.75rem; }
-    .tag-full { background:#fbe9e7; color:#c62828; border-radius:10px; padding:1px 8px; font-size:0.75rem; }
-    .tag-si { background:#e3f2fd; color:#1565c0; border-radius:10px; padding:1px 8px; font-size:0.75rem; }
-    .tag-sb { background:#fff3e0; color:#e65100; border-radius:10px; padding:1px 8px; font-size:0.75rem; }
-    div[data-testid="stMetricValue"] { font-size:1.4rem !important; }
-    .center-box { max-width:360px; margin:4rem auto; text-align:center; }
-</style>
-""", unsafe_allow_html=True)
+with open(os.path.join(os.path.dirname(__file__), "style.css"), encoding="utf-8") as f:
+    css = f.read()
+
+# detect dark theme and append override
+try:
+    if st.get_option("theme.base") == "dark":
+        css += """
+        .card { background:#1e1e1e !important; border-color:#333 !important; }
+        .card-sm { color:#999 !important; }
+        .tag-ok { background:#1b3d1f !important; color:#66bb6a !important; }
+        .tag-full { background:#3d1b1b !important; color:#ef5350 !important; }
+        .tag-si { background:#1b2d3d !important; color:#42a5f5 !important; }
+        .tag-sb { background:#3d2d1b !important; color:#ffa726 !important; }
+        """
+except Exception:
+    pass
+
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 if "page" not in st.session_state:

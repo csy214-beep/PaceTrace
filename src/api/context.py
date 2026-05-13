@@ -1,16 +1,14 @@
-"""应用上下文：全局持有当前登录用户信息和 token。"""
 import json
 import os
 
 from . import client
 from .models import User, RunStandard, OauthToken
 
-_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".data")
+_config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".data")
 _USER_FILE = os.path.join(_config_dir, ".user")
 
 
 def _build_user(data: dict) -> User:
-    """从 dict 构建 User，自动转换嵌套的 OauthToken"""
     kwargs = {}
     for k, v in data.items():
         if k not in User.__dataclass_fields__:
