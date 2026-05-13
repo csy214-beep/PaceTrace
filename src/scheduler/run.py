@@ -180,7 +180,7 @@ class RunScheduler:
         return False
 
     def _tick(self):
-        from api.run import get_run_info, save_run_record_v2
+        from api.run import get_run_info, get_run_standard, save_run_record_v2
 
         cfg = load()
         if not cfg.get("enabled"):
@@ -212,6 +212,11 @@ class RunScheduler:
         if not sel:
             return
 
+        # fetch year_semester from run standard dynamically (matching Java behavior)
+        std_resp = get_run_standard()
+        std = std_resp.get("response") or {}
+        year_semester = std.get("semesterYear") or ""
+
         # distance + speed
         d_min = cfg.get("distance", {}).get("min", 2000)
         d_max = cfg.get("distance", {}).get("max", 5000)
@@ -223,8 +228,9 @@ class RunScheduler:
         dur = max(1, int(dist / (speed * 1000 / 3600) / 60))
 
         track = _build_track(sel["coords"], dist)
+        # track format: lng-lat-timestamp-accuracy (same as Java TrackUtils.getTrackToString)
         pts_str = json.dumps(
-            [f"{p[1]}-{p[0]}-{int(datetime.now().timestamp()*1000) + i*int(dur*60*1000/max(len(track),1))}-{round(random.uniform(3,15),1)}"
+            [f"{p[1]}-{p[0]}-{int(datetime.now().timestamp()*1000) + i*int(dur*60*1000/max(len(track),1))}-{random.randrange(5, 10)}"
              for i, p in enumerate(track)],
             ensure_ascii=False,
         )
@@ -233,6 +239,7 @@ class RunScheduler:
             distance=dist, time=dur,
             track_points=pts_str, vocal_status="1",
             record_date=datetime.now().strftime("%Y-%m-%d"),
+            year_semester=year_semester,
         )
 
         if resp and resp.get("code") == 10000:

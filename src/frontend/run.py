@@ -153,13 +153,15 @@ def show_run_page():
 
         ts_base = int(datetime.now().timestamp() * 1000)
         interval = int((duration * 60 * 1000) / max(len(track), 1))
+        # track format: lng-lat-timestamp-accuracy (same as Java TrackUtils.getTrackToString)
         pts_str = json.dumps(
             [
-                f"{p[1]}-{p[0]}-{ts_base + i * interval}-{round(random.uniform(3, 15), 1)}"
+                f"{p[1]}-{p[0]}-{ts_base + i * interval}-{random.randrange(5, 10)}"
                 for i, p in enumerate(track)
             ],
             ensure_ascii=False,
         )
+        year_semester = std.get("semesterYear", "")
         if speed_ok and st.button("提交跑步记录", key="run_submit", type="primary", use_container_width=True):
             r = api_call(
                 run.save_run_record_v2,
@@ -168,6 +170,7 @@ def show_run_page():
                 track_points=pts_str,
                 vocal_status="1",
                 record_date=datetime.now().strftime("%Y-%m-%d"),
+                year_semester=year_semester,
             )
             if r:
                 code = r.get("code")

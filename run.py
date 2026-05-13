@@ -113,15 +113,12 @@ if __name__ == "__main__":
     threading.Thread(target=_start_run_scheduler, daemon=True).start()
 
     app = os.path.join(_SRC, "frontend", "app.py")
-    if getattr(sys, 'frozen', False):
-        from streamlit.web import cli as stcli
-        sys.argv = ["streamlit", "run", app]
-        try:
-            stcli.main()
-        except (SystemExit, KeyboardInterrupt):
-            pass
-    else:
-        os.system(f"streamlit run \"{app}\"")
+    from streamlit.web import cli as stcli
+    sys.argv = ["streamlit", "run", app]
+    try:
+        stcli.main()
+    except (SystemExit, KeyboardInterrupt):
+        pass
 
     print("[scheduler] web ui closed, scheduler keeps running in background")
     print("[scheduler] press Ctrl+C or use tray menu to exit")

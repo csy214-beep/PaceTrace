@@ -63,7 +63,9 @@ def show_club_page():
                             st.error(f"退出失败: {r.get('msg', '未知错误')}")
     else:
         st.caption("暂无学期项目")
-
+    st.caption(
+        "当前俱乐部签到/签退功能未经充分测试，请谨慎使用，如发现错误请及时反馈给作者"
+    )
     st.divider()
     st.markdown("#### 报名活动")
     types_data = st.session_state.club_types

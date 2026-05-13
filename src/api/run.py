@@ -65,9 +65,8 @@ def start_run(student_id: int = None) -> dict:
 
 def save_run_record(user_id: int = None, distance: int = 0, time: int = 0,
                     track_points: str = "", inner_school: str = "1",
-                    year_semester: int = None) -> dict:
+                    year_semester: int = 0) -> dict:
     uid = user_id or ctx.user.userId
-    ys = year_semester or 20261
     return client.post("v1/unirun/save/run/record", {
         "distanceTimeStatus": 0,
         "innerSchool": inner_school,
@@ -76,13 +75,13 @@ def save_run_record(user_id: int = None, distance: int = 0, time: int = 0,
         "trackPoints": track_points,
         "userId": uid,
         "vocalStatus": "",
-        "yearSemester": ys,
+        "yearSemester": year_semester,
     })
 
 
 def save_run_record_v2(user_id: int = None, distance: int = 0, time: int = 0,
                        track_points: str = "", reality_track: str = "",
-                       inner_school: str = "1", year_semester: str = "20261",
+                       inner_school: str = "1", year_semester: str = "",
                        record_date: str = "", again_run_status: str = "",
                        again_run_time: int = 0,
                        distance_time_status: str = "1",
