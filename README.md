@@ -81,7 +81,6 @@ AMAP_SECURITY=your_amap_security_code
 | pystray | 0.19.5 | LGPL-3.0 | System tray icon |
 | Pillow | 12.2.0 | Historical | Tray icon rendering |
 | python-dotenv | 1.2.2 | BSD 3-Clause | Environment config loading |
-| tqdm | 4.67.3 | MPL-2.0 | Download progress bar (installer) |
 
 This project is subject to the terms of all above licenses.
 
