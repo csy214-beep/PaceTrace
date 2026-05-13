@@ -44,6 +44,7 @@ def load() -> dict:
             "distance": {"min": 2000, "max": 5000},
             "speed": {"min": 5.0, "max": 12.0},
             "last_run": None,
+            "last_run_date": None,
         }
 
 
@@ -187,6 +188,12 @@ class RunScheduler:
         if not self._in_window(cfg):
             return
 
+        # daily limit: max 1 run per day
+        today = datetime.now().strftime("%Y-%m-%d")
+        if cfg.get("last_run_date") == today:
+            logger.debug("tick: already ran today (%s), skip", today)
+            return
+
         # load maps directly
         maps = _load_maps()
         if not maps:
@@ -233,6 +240,7 @@ class RunScheduler:
             notify("行迹", f"自动跑步完成: {dist}m {dur}min")
             s = load()
             s["last_run"] = datetime.now().isoformat()
+            s["last_run_date"] = today
             save(s)
         else:
             msg = resp.get("msg", "?") if resp else "no response"
