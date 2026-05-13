@@ -123,13 +123,17 @@ def show_club_page():
                         r = api_call(club.join_activity, activity_id=a["clubActivityId"])
                         if r:
                             resp_data = r.get("response") or {}
-                            if r.get("code") == 10000 and resp_data.get("status") != "0":
+                            ok = r.get("code") == 10000
+                            if isinstance(resp_data, dict):
+                                ok = ok and resp_data.get("status") != "0"
+                            if ok:
                                 st.success("报名成功")
                                 notify("行迹", f"报名成功: {a.get('activityName')}")
                                 st.session_state.my_acts = api_call(club.get_my_activities)
                                 st.rerun()
                             else:
-                                msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                msg = msg or r.get("msg", "未知错误")
                                 st.error(f"报名失败: {msg}")
                                 notify("行迹", f"报名失败: {msg}")
                 if already:
@@ -141,13 +145,17 @@ def show_club_page():
                         r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
                         if r:
                             resp_data = r.get("response") or {}
-                            if r.get("code") == 10000 and resp_data.get("status") != "0":
+                            ok = r.get("code") == 10000
+                            if isinstance(resp_data, dict):
+                                ok = ok and resp_data.get("status") != "0"
+                            if ok:
                                 st.success("已取消")
                                 notify("行迹", f"已取消报名: {a.get('activityName')}")
                                 st.session_state.my_acts = api_call(club.get_my_activities)
                                 st.rerun()
                             else:
-                                msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                msg = msg or r.get("msg", "未知错误")
                                 st.error(f"取消失败: {msg}")
                                 notify("行迹", f"取消失败: {msg}")
         else:
@@ -274,7 +282,8 @@ def show_club_page():
                                 )
                                 if r:
                                     resp_data = r.get("response") or {}
-                                    msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                    msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                    msg = msg or r.get("msg", "未知错误")
                                     if r.get("code") == 10000:
                                         st.success(f"{label}成功")
                                         notify("行迹", f"{label}成功")
@@ -292,12 +301,16 @@ def show_club_page():
                             r = api_call(club.cancel_activity, activity_id=a["clubActivityId"])
                             if r:
                                 resp_data = r.get("response") or {}
-                                if r.get("code") == 10000 and resp_data.get("status") != "0":
+                                ok = r.get("code") == 10000
+                                if isinstance(resp_data, dict):
+                                    ok = ok and resp_data.get("status") != "0"
+                                if ok:
                                     st.success("已取消")
                                     notify("行迹", "报名已取消")
                                     st.rerun()
                                 else:
-                                    msg = resp_data.get("message") or r.get("msg", "未知错误")
+                                    msg = resp_data.get("message", "") if isinstance(resp_data, dict) else str(resp_data)
+                                    msg = msg or r.get("msg", "未知错误")
                                     st.error(f"取消失败: {msg}")
             if history:
                 with st.expander(f"历史记录 ({len(history)} 条)"):
