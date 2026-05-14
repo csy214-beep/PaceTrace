@@ -251,7 +251,7 @@ def show_club_page():
                     c1, c2 = st.columns([3, 1])
                     if sd.get("latitude") and sd.get("longitude"):
                         lat_v, lng_v = random_point_nearby(
-                            sd["latitude"], sd["longitude"], 200
+                            sd["latitude"], sd["longitude"], 100
                         )
                     else:
                         lat_v, lng_v = None, None
