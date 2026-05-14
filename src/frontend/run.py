@@ -6,11 +6,11 @@ import streamlit as st
 
 from api import run
 from api import ctx
+from lib.geo import route_distance, build_track
+from lib.maps import load_maps
 from frontend.utils import (
     api_call,
     all_maps,
-    route_distance,
-    build_track,
     draw_map_folium,
     AMAP_KEY,
 )
@@ -72,11 +72,11 @@ def show_run_page():
             st.metric("已完成次数", f"{cur_days}次", f"{days_pct}%")
             st.progress(days_pct / 100)
 
-    all_map_list = list(all_maps)
+    all_map_list = list(all_maps())
     if "custom_maps" in st.session_state:
         all_map_list.extend(st.session_state.custom_maps)
 
-    if not all_maps:
+    if not all_map_list:
         st.info("maps 目录下没有路线文件")
     else:
         sel_name = st.selectbox("选择路线", [m["name"] for m in all_map_list], key="map_sel")
@@ -244,7 +244,7 @@ def show_run_page():
             st.rerun()
 
         st.markdown("##### 路线")
-        map_opts = {m["name"]: m["id"] for m in all_maps}
+        map_opts = {m["name"]: m["id"] for m in all_maps()}
         if "custom_maps" in st.session_state:
             for m in st.session_state.custom_maps:
                 map_opts[m["name"]] = m["id"]

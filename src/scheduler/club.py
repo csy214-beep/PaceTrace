@@ -2,13 +2,13 @@
 
 import json
 import logging
-import math
 import os
-import random
 import threading
 import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 
+from lib.geo import random_point
+from lib.time import parse_time
 from tray.tray import notify, update_menu as _update_menu
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".data")
@@ -38,37 +38,6 @@ def save_state(state: dict):
 
 
 # ── 工具函数 ────────────────────────────────────────────────
-def _random_point(lat: str, lng: str, radius: float = 100):
-    """在给定坐标 radius 米范围内生成随机偏移点"""
-    angle = random.random() * 2 * math.pi
-    r = math.sqrt(random.random()) * radius
-    dx = r * math.cos(angle) / (111320 * math.cos(math.radians(float(lat))))
-    dy = r * math.sin(angle) / 111320
-    return str(float(lat) + dy), str(float(lng) + dx)
-
-
-def _parse_time(t: str) -> datetime | None:
-    """
-    解析字符串为 datetime。
-    若只包含时间（如 '18:00'），返回当天的 datetime；
-    否则按完整格式解析。
-    """
-    if not t:
-        return None
-    # 尝试完整日期时间
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(t, fmt)
-        except ValueError:
-            continue
-    # 纯时间格式
-    try:
-        time_obj = datetime.strptime(t, "%H:%M").time()
-        return datetime.combine(date.today(), time_obj)
-    except ValueError:
-        return None
-
-
 def _activity_window(data: dict) -> tuple[datetime | None, datetime | None]:
     """
     从 API 返回的 data 中提取活动窗口。
@@ -80,10 +49,10 @@ def _activity_window(data: dict) -> tuple[datetime | None, datetime | None]:
     则自动将 end 加一天。
     返回 (window_start - 10min, window_end + 10min)
     """
-    st = data.get("startTime") or data.get("start_time")  # 适配可能的字段名差异
+    st = data.get("startTime") or data.get("start_time")
     et = data.get("endTime") or data.get("end_time")
-    start = _parse_time(st) if st else None
-    end = _parse_time(et) if et else None
+    start = parse_time(st) if st else None
+    end = parse_time(et) if et else None
     # 跨天修正：如果 end < start（例如 start=22:00, end=02:00）
     if start and end and end < start:
         end += timedelta(days=1)
@@ -159,13 +128,21 @@ class SignScheduler:
 
     # ── 等待活动窗口 ──────────────────────────────────────
     def _get_sign_in_data(self):
-        """获取签到状态数据，异常时返回 None"""
+        """获取签到状态数据，异常时返回 None，顺便缓存场地坐标供签退回退"""
         from api.club import get_sign_in_tf
 
         try:
             resp = get_sign_in_tf()
             if resp and resp.get("code") == 10000:
-                return resp.get("response") or {}
+                data = resp.get("response") or {}
+                if data.get("latitude") and data.get("longitude"):
+                    state = load_state()
+                    state["last_lat"] = data["latitude"]
+                    state["last_lng"] = data["longitude"]
+                    if data.get("activityId"):
+                        state["last_aid"] = data["activityId"]
+                    save_state(state)
+                return data
         except Exception as e:
             logger.error("get_sign_in_tf error: %s", e)
         return None
@@ -231,11 +208,24 @@ class SignScheduler:
         lat = data.get("latitude")
         lng = data.get("longitude")
 
-        if not aid or not lat or not lng:
-            logger.info("tick: missing data (aid=%s lat=%s lng=%s)", aid, lat, lng)
+        # 如果 API 未返回坐标，尝试用上次缓存的场地坐标回退
+        if not lat or not lng:
+            state = load_state()
+            lat = state.get("last_lat")
+            lng = state.get("last_lng")
+            if not aid:
+                aid = state.get("last_aid")
+            if lat and lng:
+                logger.warning("tick: API missing coords, falling back to cached (lat=%s lng=%s)", lat, lng)
+            else:
+                logger.info("tick: missing data and no cached coords (aid=%s)", aid)
+                return
+
+        if not aid:
+            logger.info("tick: missing activityId and no cached fallback")
             return
 
-        lat_r, lng_r = _random_point(lat, lng, 100)
+        lat_r, lng_r = random_point(lat, lng, 100)
 
         if status == "0":
             # 未签到 → 签到

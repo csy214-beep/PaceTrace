@@ -18,6 +18,7 @@ run.py              # launcher
 src/
   api/              # API client — custom MD5-based signature
   frontend/         # Streamlit pages
+  lib/              # shared utils: geo, time, maps (used by both scheduler & frontend)
   scheduler/        # background threads for auto sign-in & run
   maps/             # route JSON files
   tray/             # system tray icon
@@ -38,7 +39,7 @@ Required env vars: `APPKEY`, `APPSECRET`, `BASE_URL`, `UA`. Copy `.env.example` 
 2. `scheduler/club.py` polls every 60s; when inside activity window, checks `signStatus`:
    - `"0"` → POST `signInOrSignBack` with `signType: "1"` (sign in)
    - `"1"` → POST `signInOrSignBack` with `signType: "2"` (sign back)
-3. Coordinates offset 100m from venue coords (`_random_point`)
+3. Coordinates offset 100m from venue coords via `lib.geo.random_point()`
 4. POST body matches Java `SignBody`: `activityId`, `latitude`, `longitude`, `signType`, `studentId`
 
 ## Run submission
@@ -79,3 +80,4 @@ Two independent background threads (controlled via `.data/scheduler_club.json` a
 - Year semester tie: `save_run_record` v1 is unused; `save_run_record_v2` is the active endpoint
 - No test framework or CI tests — `test.py` exists but is ad-hoc
 - Java reference code in `java/` dir is gitignored (decompiled Android APK)
+- Shared logic lives in `src/lib/`: `geo.py` (random_point, route_distance, build_track), `time.py` (parse_time), `maps.py` (load_maps). Don't duplicate these in scheduler or frontend.
