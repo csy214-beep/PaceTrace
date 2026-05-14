@@ -19,13 +19,15 @@ echo   PaceTrace 行迹  安装 / 启动工具
 echo ==============================================
 echo   1  完整安装 / 更新
 echo   2  直接启动（跳过安装）
-echo   3  退出
+echo   3  添加到开机启动
+echo   4  退出
 echo.
-set /p "opt=请选择 (1/2/3): "
+set /p "opt=请选择 (1/2/3/4): "
 if "%opt%"=="1" goto install
 if "%opt%"=="2" goto launch
-if "%opt%"=="3" goto end
-echo 请输入 1、2 或 3
+if "%opt%"=="3" goto add_startup
+if "%opt%"=="4" goto end
+echo 请输入 1、2、3 或 4
 pause
 goto menu
 
@@ -84,7 +86,7 @@ if errorlevel 1 (
 :: 选择仓库源
 echo 请选择仓库源:
 echo   1. GitHub  (github.com/csy214-beep/pacetrace)
-echo   2. Gitee   (gitee.com/pfolg/pacetrace)
+echo   2. Gitee   (gitee.com/pfolg/pacetrace) [推荐]
 set /p "repo_opt=请输入 1 或 2: "
 if "%repo_opt%"=="1" set "REPO_URL=https://github.com/csy214-beep/pacetrace.git"
 if "%repo_opt%"=="2" set "REPO_URL=https://gitee.com/pfolg/pacetrace.git"
@@ -205,6 +207,7 @@ echo ==============================================
 echo   PaceTrace 启动中，请稍候...
 echo   主界面:   http://localhost:8501
 echo   轨迹画板: http://localhost:8852/drawer.html
+echo   程序运行中，此界面不可关闭！
 echo   Ctrl+C 停止
 echo ==============================================
 echo.
@@ -218,6 +221,31 @@ echo.
 echo   程序已退出（返回码 %errorlevel%）
 pause
 exit /b %errorlevel%
+
+:: ====================== 添加到开机启动 ==================
+:add_startup
+echo.
+set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+set "SHORTCUT=%STARTUP_DIR%\PaceTrace.lnk"
+if exist "%SHORTCUT%" (
+    echo   快捷方式已存在，准备重新创建
+    set /p "del_old=   是否删除原快捷方式？ (Y/n) "
+    if /i "!del_old!"=="" set del_old=Y
+    if /i "!del_old!"=="Y" del /f /q "%SHORTCUT%" >nul 2>nul
+)
+if not exist "%SHORTCUT%" (
+    powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT%'); $s.TargetPath = '%~f0'; $s.WorkingDirectory = '%SCRIPT_DIR%%PROJ_DIR%'; $s.Description = 'PaceTrace - 自动运行'; $s.Save()" >nul 2>nul
+    if exist "%SHORTCUT%" (
+        echo   开机启动添加成功  位置: %SHORTCUT%
+    ) else (
+        echo   添加失败，请手动将 run.bat 复制到开始菜单启动文件夹
+    )
+) else (
+    echo   保留原快捷方式，未做更改
+)
+echo.
+pause
+goto menu
 
 :: ====================== 退出 ==========================
 :end
