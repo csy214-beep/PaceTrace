@@ -86,14 +86,14 @@ if errorlevel 1 (
 
 :: 选择仓库源
 echo 请选择仓库源:
-echo   1. GitHub  (github.com/csy214-beep/pacetrace)
+echo   1. GitHub  (github.com/igugyj/pacetrace)
 echo   2. Gitee   (gitee.com/pfolg/pacetrace) [推荐]
 set /p "repo_opt=请输入 1 或 2: "
-if "%repo_opt%"=="1" set "REPO_URL=https://github.com/csy214-beep/pacetrace.git"
+if "%repo_opt%"=="1" set "REPO_URL=https://github.com/igugyj/pacetrace.git"
 if "%repo_opt%"=="2" set "REPO_URL=https://gitee.com/pfolg/pacetrace.git"
 if "%REPO_URL%"=="" (
     echo   无效选择，默认使用 GitHub
-    set "REPO_URL=https://github.com/csy214-beep/pacetrace.git"
+    set "REPO_URL=https://github.com/igugyj/pacetrace.git"
 )
 
 :: 询问是否同步代码

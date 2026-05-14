@@ -1,9 +1,9 @@
 # PaceTrace
 
-![GitHub Repo stars](https://img.shields.io/github/stars/csy214-beep/PaceTrace?style=social)
-![GitHub forks](https://img.shields.io/github/forks/csy214-beep/PaceTrace?style=social)
-![GitHub issues](https://img.shields.io/github/issues/csy214-beep/PaceTrace?style=social)
-[![Sync to Gitee](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml/badge.svg?branch=main)](https://github.com/csy214-beep/PaceTrace/actions/workflows/sync-to-gitee.yml)
+![GitHub Repo stars](https://img.shields.io/github/stars/igugyj/PaceTrace?style=social)
+![GitHub forks](https://img.shields.io/github/forks/igugyj/PaceTrace?style=social)
+![GitHub issues](https://img.shields.io/github/issues/igugyj/PaceTrace?style=social)
+[![Sync to Gitee](https://github.com/igugyj/PaceTrace/actions/workflows/sync-to-gitee.yml/badge.svg?branch=main)](https://github.com/igugyj/PaceTrace/actions/workflows/sync-to-gitee.yml)
 
 A campus run management dashboard with club activity support, auto sign-in/run schedulers, and an AMap-based track drawer.
 
@@ -22,7 +22,7 @@ A campus run management dashboard with club activity support, auto sign-in/run s
 ## Quick Start
 
 ```bash
-git clone https://github.com/csy214-beep/PaceTrace.git
+git clone https://github.com/igugyj/PaceTrace.git
 cd PaceTrace
 python -m venv .venv
 # source .venv/bin/activate    # Linux / macOS
