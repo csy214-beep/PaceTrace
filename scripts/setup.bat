@@ -21,14 +21,16 @@ echo ==============================================
 echo   1  完整安装 / 更新
 echo   2  直接启动（跳过安装）
 echo   3  添加到开机启动
-echo   4  退出
+echo   4  卸载（删除项目文件夹）
+echo   5  退出
 echo.
-set /p "opt=请选择 (1/2/3/4): "
+set /p "opt=请选择 (1/2/3/4/5): "
 if "%opt%"=="1" goto install
 if "%opt%"=="2" goto launch
 if "%opt%"=="3" goto add_startup
-if "%opt%"=="4" goto end
-echo 请输入 1、2、3 或 4
+if "%opt%"=="4" goto uninstall
+if "%opt%"=="5" goto end
+echo 请输入 1、2、3 、4或5
 pause
 goto menu
 
@@ -245,6 +247,34 @@ if not exist "%SHORTCUT%" (
     echo   保留原快捷方式，未做更改
 )
 echo.
+pause
+goto menu
+
+
+:: ====================== 卸载（删除项目文件夹）===============
+:uninstall
+echo.
+set "FULL_PROJ=%SCRIPT_DIR%%PROJ_DIR%"
+if not exist "%FULL_PROJ%" (
+    echo   文件夹不存在: %FULL_PROJ%
+    pause
+    goto menu
+)
+echo   即将删除项目文件夹: %FULL_PROJ%
+echo   包含虚拟环境和所有配置文件！
+set /p "confirm=确认删除？(y/N) "
+if /i "%confirm%" neq "Y" (
+    echo   已取消
+    pause
+    goto menu
+)
+echo   正在删除...
+rmdir /s /q "%FULL_PROJ%"
+if exist "%FULL_PROJ%" (
+    echo   删除失败，可能有文件被占用，请关闭相关程序后重试
+) else (
+    echo   删除成功
+)
 pause
 goto menu
 
