@@ -26,5 +26,5 @@ def show_about_page():
 - and **YOU**.
 
 ---
-[GitHub](https://github.com/csy214-beep/PaceTrace) · [ISSUE](https://github.com/csy214-beep/PaceTrace/issues) · [PR](https://github.com/csy214-beep/PaceTrace/pulls)
+[GitHub](https://github.com/igugyj/PaceTrace) · [ISSUE](https://github.com/igugyj/PaceTrace/issues) · [PR](https://github.com/igugyj/PaceTrace/pulls)
     """)
