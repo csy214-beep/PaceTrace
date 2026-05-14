@@ -4,5 +4,5 @@ folium==0.20.0
 pillow==12.2.0
 pystray==0.19.5
 python-dotenv==1.2.2
-requests==2.34.0
+requests==2.34.1
 streamlit==1.57.0
