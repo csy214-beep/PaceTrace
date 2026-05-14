@@ -1,18 +1,224 @@
 @echo off
-chcp 65001 >nul
-echo === è¡Œè¿¹ - ç¯å¢ƒåˆå§‹åŒ– ===
-echo.
+setlocal enabledelayedexpansion
 
-if not exist ".venv\" (
-    echo [1/2] åˆ›å»ºè™šæ‹Ÿç¯å¢ƒ...
-    python -m venv .venv
-) else (
-    echo [1/2] è™šæ‹Ÿç¯å¢ƒå·²å­˜åœ¨ï¼Œè·³è¿‡
+:: ====================== ÅäÖÃ ======================
+set "MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple"
+set "PROJ_DIR=PaceTrace"
+set "MIN_MAJOR=3"
+set "MIN_MINOR=10"
+
+:: ÇĞ»»µ½½Å±¾ËùÔÚÄ¿Â¼£¬²¢¼ÇÂ¼¾ø¶ÔÂ·¾¶¹©ºóĞøÊ¹ÓÃ
+cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+
+:: ====================== Ö÷²Ëµ¥ ======================
+:menu
+cls
+echo ==============================================
+echo   PaceTrace ĞĞ¼£  °²×° / Æô¶¯¹¤¾ß
+echo ==============================================
+echo   1  ÍêÕû°²×° / ¸üĞÂ
+echo   2  Ö±½ÓÆô¶¯£¨Ìø¹ı°²×°£©
+echo   3  ÍË³ö
+echo.
+set /p "opt=ÇëÑ¡Ôñ (1/2/3): "
+if "%opt%"=="1" goto install
+if "%opt%"=="2" goto launch
+if "%opt%"=="3" goto end
+echo ÇëÊäÈë 1¡¢2 »ò 3
+pause
+goto menu
+
+:: ====================== ²éÕÒ¿ÉÓÃ Python ===============
+:: ĞŞ¸´ºËĞÄÎÊÌâ£ºÓÃ where È¡ÍêÕûÂ·¾¶£¬±ÜÃâ±» Microsoft Store stub ½Ù³Ö
+:find_python
+set "PY_EXE="
+set "PY_VER="
+for %%c in (py python3 python) do (
+    if "!PY_EXE!"=="" (
+        for /f "tokens=* usebackq" %%p in (`where %%c 2^>nul`) do (
+            if "!PY_EXE!"=="" (
+                :: ÓÃÍêÕûÂ·¾¶Ö´ĞĞ£¬³¹µ×Ìø¹ı Store stub
+                for /f "tokens=2" %%v in ('"%%p" --version 2^>^&1') do set "ver=%%v"
+                for /f "tokens=1,2 delims=." %%a in ("!ver!") do (
+                    if %%a equ %MIN_MAJOR% if %%b geq %MIN_MINOR% (
+                        set "PY_EXE=%%p"
+                        set "PY_VER=%%a.%%b"
+                        goto :eof
+                    )
+                    if %%a gtr %MIN_MAJOR% (
+                        set "PY_EXE=%%p"
+                        set "PY_VER=%%a.%%b"
+                        goto :eof
+                    )
+                )
+            )
+        )
+    )
+)
+goto :eof
+
+:: ====================== ÍêÕû°²×° / ¸üĞÂ ===============
+:install
+echo.
+echo [1/3] ¼ì²é Python »·¾³
+call :find_python
+if "%PY_EXE%"=="" (
+    echo   Î´ÕÒµ½ Python ^>= 3.10£¬ÇëÏÈ°²×°£º
+    echo   https://www.python.org/downloads/
+    echo   °²×°Ê±Çë¹´Ñ¡ "Add Python to PATH"
+    pause
+    exit /b 1
+)
+echo   Python %PY_VER% ¡Ì  Â·¾¶: %PY_EXE%
+
+echo.
+echo [2/3] ¿ËÂ¡ / ¸üĞÂÏîÄ¿´úÂë
+where git >nul 2>nul
+if errorlevel 1 (
+    echo   Î´ÕÒµ½ Git£¬ÇëÏÈ°²×°£ºhttps://git-scm.com/downloads
+    pause
+    exit /b 1
 )
 
-echo [2/2] å®‰è£…ä¾èµ–...
-call .venv\Scripts\activate.bat
-pip install -r requirements.txt
+:: Ñ¡Ôñ²Ö¿âÔ´
+echo ÇëÑ¡Ôñ²Ö¿âÔ´:
+echo   1. GitHub  (github.com/csy214-beep/pacetrace)
+echo   2. Gitee   (gitee.com/pfolg/pacetrace)
+set /p "repo_opt=ÇëÊäÈë 1 »ò 2: "
+if "%repo_opt%"=="1" set "REPO_URL=https://github.com/csy214-beep/pacetrace.git"
+if "%repo_opt%"=="2" set "REPO_URL=https://gitee.com/pfolg/pacetrace.git"
+if "%REPO_URL%"=="" (
+    echo   ÎŞĞ§Ñ¡Ôñ£¬Ä¬ÈÏÊ¹ÓÃ GitHub
+    set "REPO_URL=https://github.com/csy214-beep/pacetrace.git"
+)
+
+:: Ñ¯ÎÊÊÇ·ñÍ¬²½´úÂë
+set /p "do_sync=¿ËÂ¡/¸üĞÂÏîÄ¿´úÂë£¿ (Y/n) "
+if /i "%do_sync%"=="" set do_sync=Y
+if /i "%do_sync%"=="Y" (
+    if exist "%PROJ_DIR%\.git" (
+        echo   ¸üĞÂ´úÂë...
+        pushd "%PROJ_DIR%"
+        git pull origin main
+        popd
+    ) else (
+        echo   ¿ËÂ¡²Ö¿â...
+        git clone --branch main --depth 1 "%REPO_URL%" "%PROJ_DIR%"
+    )
+    if not exist "%PROJ_DIR%\run.py" (
+        echo   ´úÂë»ñÈ¡Ê§°Ü£¬Çë¼ì²éÍøÂç»ò²Ö¿âµØÖ·
+        pause
+        exit /b 1
+    )
+    echo   ´úÂëÍ¬²½Íê³É ¡Ì
+) else (
+    echo   Ìø¹ı
+)
+
 echo.
-echo åˆå§‹åŒ–å®Œæˆã€‚è¿è¡Œ run.bat å¯åŠ¨ç¨‹åºã€‚
+echo [3/4] ³õÊ¼»¯ÅäÖÃÎÄ¼ş
+if exist "%PROJ_DIR%\.env.example" (
+    if not exist "%PROJ_DIR%\.env" (
+        copy "%PROJ_DIR%\.env.example" "%PROJ_DIR%\.env" >nul
+        echo   .env.example -^> .env  ¡Ì  Çë°´Ğè±à¼­ %PROJ_DIR%\.env
+    ) else (
+        echo   .env ÒÑ´æÔÚ£¬Ìø¹ı£¨²»¸²¸ÇÏÖÓĞÅäÖÃ£©
+    )
+) else (
+    echo   Î´ÕÒµ½ .env.example£¬Ìø¹ı
+)
+
+echo.
+echo [4/4] ÅäÖÃĞéÄâ»·¾³ + °²×°ÒÀÀµ
+set /p "do_venv=ÅäÖÃĞéÄâ»·¾³²¢°²×°ÒÀÀµ£¿ (Y/n) "
+if /i "%do_venv%"=="" set do_venv=Y
+if /i "%do_venv%" neq "Y" (
+    echo   Ìø¹ı
+    goto ask_launch
+)
+
+if not exist "%PROJ_DIR%\.venv" (
+    echo   ´´½¨ĞéÄâ»·¾³...
+    "%PY_EXE%" -m venv "%PROJ_DIR%\.venv"
+    if errorlevel 1 (
+        echo   ĞéÄâ»·¾³´´½¨Ê§°Ü
+        echo   Python Â·¾¶: %PY_EXE%
+        echo   ÇëÈ·ÈÏ¸Ã Python °²×°ÍêÕû£¨º¬±ê×¼¿â£©
+        pause
+        exit /b 1
+    )
+) else (
+    echo   ĞéÄâ»·¾³ÒÑ´æÔÚ£¬Ìø¹ı´´½¨
+)
+
+:: ¶ş´ÎÈ·ÈÏ venv ÀïµÄ python.exe ÕæÊµ´æÔÚ
+if not exist "%PROJ_DIR%\.venv\Scripts\python.exe" (
+    echo   ĞéÄâ»·¾³²»ÍêÕû£¬³¢ÊÔÖØ½¨...
+    rmdir /s /q "%PROJ_DIR%\.venv"
+    "%PY_EXE%" -m venv "%PROJ_DIR%\.venv"
+    if not exist "%PROJ_DIR%\.venv\Scripts\python.exe" (
+        echo   ĞéÄâ»·¾³ÖØ½¨Ê§°Ü£¬Çë¼ì²é Python °²×°
+        pause
+        exit /b 1
+    )
+)
+echo   ĞéÄâ»·¾³ÒÑ¾ÍĞ÷ ¡Ì
+
+echo   Éı¼¶ pip...
+"%PROJ_DIR%\.venv\Scripts\python.exe" -m pip install --upgrade pip -i %MIRROR% --quiet
+
+if exist "%PROJ_DIR%\requirements.txt" (
+    echo   °²×°ÒÀÀµ...
+    "%PROJ_DIR%\.venv\Scripts\python.exe" -m pip install -r "%PROJ_DIR%\requirements.txt" -i %MIRROR%
+    if errorlevel 1 (
+        echo   ÒÀÀµ°²×°Ê§°Ü£¬Çë¼ì²éÈÕÖ¾
+        pause
+        exit /b 1
+    )
+    echo   ÒÀÀµ°²×°Íê³É ¡Ì
+) else (
+    echo   Î´ÕÒµ½ requirements.txt£¬Ìø¹ıÒÀÀµ°²×°
+)
+
+:ask_launch
+set /p "start_now=°²×°Íê³É£¡ÏÖÔÚÆô¶¯ PaceTrace£¿ (Y/n) "
+if /i "%start_now%"=="" set start_now=Y
+if /i "%start_now%"=="Y" goto launch
+echo   ÊÖ¶¯Æô¶¯£ºcd %PROJ_DIR% ^&^& .venv\Scripts\python run.py
 pause
+exit /b 0
+
+:: ====================== Ö±½ÓÆô¶¯ ======================
+:launch
+:: ÔÚ cd Ö®Ç°ÓÃ¾ø¶ÔÂ·¾¶Ëø¶¨ venv python
+:: £¨cd Ö®ºóÏà¶ÔÂ·¾¶Ê§Ğ§£¬ÊÇ ModuleNotFoundError µÄ¸ù±¾Ô­Òò£©
+set "VENV_PYTHON=%SCRIPT_DIR%%PROJ_DIR%\.venv\Scripts\python.exe"
+if not exist "%VENV_PYTHON%" (
+    echo   ĞéÄâ»·¾³²»´æÔÚ£¬ÇëÏÈÍêÕû°²×°£¨Ñ¡Ïî 1£©
+    pause
+    exit /b 1
+)
+
+echo.
+echo ==============================================
+echo   PaceTrace Æô¶¯ÖĞ£¬ÇëÉÔºò...
+echo   Ö÷½çÃæ:   http://localhost:8501
+echo   ¹ì¼£»­°å: http://localhost:8852/drawer.html
+echo   Ctrl+C Í£Ö¹
+echo ==============================================
+echo.
+
+set "VIRTUAL_ENV=%SCRIPT_DIR%%PROJ_DIR%\.venv"
+set "PYTHONHOME="
+
+cd "%SCRIPT_DIR%%PROJ_DIR%"
+"%VENV_PYTHON%" run.py
+echo.
+echo   ³ÌĞòÒÑÍË³ö£¨·µ»ØÂë %errorlevel%£©
+pause
+exit /b %errorlevel%
+
+:: ====================== ÍË³ö ==========================
+:end
+exit /b 0
