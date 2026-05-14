@@ -1,14 +1,13 @@
-import json
 import os
-import math
-import random
 import tempfile
 from datetime import datetime, date, timedelta
 
 import streamlit as st
 import folium
 
-from api import auth, run, club
+from api import auth
+from lib.geo import random_point
+from lib.maps import load_maps
 from frontend.logger import logger
 
 
@@ -30,57 +29,16 @@ def api_call(func, *args, **kwargs):
         return None
 
 
-MAPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "maps")
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
-
-def load_maps():
-    items = []
-    if not os.path.isdir(MAPS_DIR):
-        return items
-    for f in sorted(os.listdir(MAPS_DIR)):
-        if not f.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(MAPS_DIR, f), encoding="utf-8") as fh:
-                data = json.load(fh)
-            raw = data.get("mapData", [])
-            pts = []
-            for p in raw:
-                lng, lat = p.split(",")
-                pts.append([float(lat), float(lng)])
-            if pts:
-                items.append({"id": data.get("mapId", f), "name": data.get("mapName", f), "coords": pts})
-        except Exception:
-            pass
-    return items
+_all_maps_cache = None
 
 
-all_maps = load_maps()
-
-
-def route_distance(coords):
-    d = 0
-    for i in range(1, len(coords)):
-        a, b = coords[i - 1], coords[i]
-        dx = (b[1] - a[1]) * 111320 * math.cos(math.radians((a[0] + b[0]) / 2))
-        dy = (b[0] - a[0]) * 111320
-        d += math.sqrt(dx * dx + dy * dy)
-    return int(d)
-
-
-def build_track(coords, target_dist):
-    full_d = route_distance(coords)
-    if full_d <= 0:
-        return coords
-    n = len(coords)
-    start = random.randint(0, n - 1)
-    result = []
-    i = start
-    while route_distance(result) < target_dist:
-        result.append(coords[i])
-        i = (i + 1) % n
-    return result
+def all_maps():
+    global _all_maps_cache
+    if _all_maps_cache is None:
+        _all_maps_cache = load_maps()
+    return _all_maps_cache
 
 
 def draw_map_folium(coords):
@@ -100,14 +58,6 @@ def draw_map_folium(coords):
     tmp.write(m.get_root().render())
     tmp.close()
     return tmp.name
-
-
-def random_point_nearby(lat, lng, radius=100):
-    angle = random.random() * 2 * math.pi
-    r = math.sqrt(random.random()) * radius
-    dx = r * math.cos(angle) / (111320 * math.cos(math.radians(float(lat))))
-    dy = r * math.sin(angle) / 111320
-    return str(float(lat) + dy), str(float(lng) + dx)
 
 
 def parse_activity_time(mmdd: str, time_str: str) -> datetime | None:

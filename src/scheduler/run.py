@@ -13,12 +13,13 @@
 """
 import json
 import logging
-import math
 import os
 import random
 import threading
-from datetime import datetime, date
+from datetime import datetime
 
+from lib.geo import route_distance, build_track
+from lib.maps import load_maps
 from tray.tray import notify, update_menu as _update_menu
 
 logger = logging.getLogger("run_sched")
@@ -55,69 +56,7 @@ def save(state: dict):
             json.dump(state, f, ensure_ascii=False)
 
 
-def _route_distance(coords):
-    d = 0
-    for i in range(1, len(coords)):
-        a, b = coords[i-1], coords[i]
-        dx = (b[1] - a[1]) * 111320 * math.cos(math.radians((a[0] + b[0]) / 2))
-        dy = (b[0] - a[0]) * 111320
-        d += math.sqrt(dx*dx + dy*dy)
-    return int(d)
 
-
-def _build_track(coords, target_dist):
-    full_d = _route_distance(coords)
-    if full_d <= 0:
-        return coords
-    n = len(coords)
-    start = random.randint(0, n - 1)
-    result = []
-    i = start
-    while _route_distance(result) < target_dist:
-        result.append(coords[i])
-        i = (i + 1) % n
-    return result
-
-
-def _random_point(lat, lng, radius=100):
-    angle = random.random() * 2 * math.pi
-    r = math.sqrt(random.random()) * radius
-    dx = r * math.cos(angle) / (111320 * math.cos(math.radians(float(lat))))
-    dy = r * math.sin(angle) / 111320
-    return str(float(lat) + dy), str(float(lng) + dx)
-
-
-def _parse_time(t: str) -> datetime | None:
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%H:%M"):
-        try:
-            return datetime.strptime(t, fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def _load_maps():
-    """Load maps without depending on frontend modules."""
-    maps_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src", "maps")
-    items = []
-    if not os.path.isdir(maps_dir):
-        return items
-    for f in sorted(os.listdir(maps_dir)):
-        if not f.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(maps_dir, f), encoding="utf-8") as fh:
-                data = json.load(fh)
-            raw = data.get("mapData", [])
-            pts = []
-            for p in raw:
-                lng, lat = p.split(",")
-                pts.append([float(lat), float(lng)])
-            if pts:
-                items.append({"id": data.get("mapId", f), "name": data.get("mapName", f), "coords": pts})
-        except Exception:
-            pass
-    return items
 
 
 class RunScheduler:
@@ -195,7 +134,7 @@ class RunScheduler:
             return
 
         # load maps directly
-        maps = _load_maps()
+        maps = load_maps()
         if not maps:
             logger.info("run tick: no maps available")
             return
@@ -227,7 +166,7 @@ class RunScheduler:
         speed = random.uniform(s_min, s_max)
         dur = max(1, int(dist / (speed * 1000 / 3600) / 60))
 
-        track = _build_track(sel["coords"], dist)
+        track = build_track(sel["coords"], dist)
         # track format: lng-lat-timestamp-accuracy (same as Java TrackUtils.getTrackToString)
         pts_str = json.dumps(
             [f"{p[1]}-{p[0]}-{int(datetime.now().timestamp()*1000) + i*int(dur*60*1000/max(len(track),1))}-{random.randrange(5, 10)}"
@@ -245,9 +184,11 @@ class RunScheduler:
         if resp and resp.get("code") == 10000:
             logger.info("run auto OK: distance=%dm time=%dmin speed=%.1f", dist, dur, speed)
             notify("行迹", f"自动跑步完成: {dist}m {dur}min")
+            from api.context import ctx
             s = load()
             s["last_run"] = datetime.now().isoformat()
             s["last_run_date"] = today
+            s["last_student_id"] = ctx.user.studentId
             save(s)
         else:
             msg = resp.get("msg", "?") if resp else "no response"

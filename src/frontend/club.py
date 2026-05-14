@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from api import club
-from frontend.utils import api_call, get_activity_window, random_point_nearby
+from frontend.utils import api_call, get_activity_window
+from lib.geo import random_point
 from scheduler import load_club_state, save_club_state
 from tray.tray import notify
 from frontend.logger import logger
@@ -63,9 +64,7 @@ def show_club_page():
                             st.error(f"退出失败: {r.get('msg', '未知错误')}")
     else:
         st.caption("暂无学期项目")
-    st.caption(
-        "当前俱乐部签到/签退功能未经充分测试，请谨慎使用，如发现错误请及时反馈给作者"
-    )
+
     st.divider()
     st.markdown("#### 报名活动")
     types_data = st.session_state.club_types
@@ -73,8 +72,18 @@ def show_club_page():
     if not types_list:
         st.warning("尚未加入任何学期项目，请先加入")
     else:
-        date_opts = [(datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14)]
-        sel_date = st.selectbox("日期", date_opts, index=0, key="act_date_sel")
+        WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        date_opts = []
+        date_map = {}
+        for i in range(14):
+            d = datetime.now() + timedelta(days=i)
+            if d.weekday() >= 5:
+                continue
+            label = f"{d.strftime('%Y-%m-%d')} {WEEKDAY_CN[d.weekday()]}"
+            date_opts.append(label)
+            date_map[label] = d.strftime("%Y-%m-%d")
+        sel_label = st.selectbox("日期", date_opts, index=0, key="act_date_sel")
+        sel_date = date_map[sel_label]
         type_opts = {f"{t.get('itemName')}": t.get("itemId") for t in types_list}
         sel_type_label = st.selectbox("项目类型", list(type_opts.keys()), key="act_type_sel")
         sel_type_id = type_opts[sel_type_label]
@@ -250,14 +259,20 @@ def show_club_page():
 
                     c1, c2 = st.columns([3, 1])
                     if sd.get("latitude") and sd.get("longitude"):
-                        lat_v, lng_v = random_point_nearby(
-                            sd["latitude"], sd["longitude"], 200
+                        lat_v, lng_v = random_point(
+                            sd["latitude"], sd["longitude"], 100
+                        )
+                        st.caption(
+                            f"({sd['latitude']}, {sd['longitude']}) +{100}m 随机偏移"
                         )
                     else:
                         lat_v, lng_v = None, None
                     with c1:
                         if not lat_v or not lng_v:
-                            st.caption("坐标数据缺失，暂时无法操作")
+                            window_info = ""
+                            if start_dt and end_dt:
+                                window_info = f"（活动窗口 {start_dt.strftime('%H:%M')}-{end_dt.strftime('%H:%M')}，需等待老师开放签到）"
+                            st.caption(f"签到暂不可用{window_info}")
                         elif st.button(
                             label, key=k, use_container_width=True, type="primary"
                         ):
