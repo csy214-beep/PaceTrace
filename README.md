@@ -7,6 +7,8 @@
 
 A campus run management dashboard with club activity support, auto sign-in/run schedulers, and an AMap-based track drawer.
 
+> Android app available on [igugyj/PaceTraceKotlin](https://github.com/igugyj/PaceTraceKotlin)
+
 ## Features
 
 - **Authentication** — login with phone number and password; token persists locally.
@@ -76,7 +78,7 @@ AMAP_SECURITY=your_amap_security_code
 | Library | Version | License | Purpose |
 |---------|---------|---------|---------|
 | streamlit | 1.57.0 | Apache 2.0 | Web UI framework |
-| requests | 2.34.0 | Apache 2.0 | HTTP client for API calls |
+| requests | 2.34.1 | Apache 2.0 | HTTP client for API calls |
 | folium | 0.20.0 | MIT | Interactive route maps |
 | pystray | 0.19.5 | LGPL-3.0 | System tray icon |
 | Pillow | 12.2.0 | Historical | Tray icon rendering |
