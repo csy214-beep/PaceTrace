@@ -7,14 +7,14 @@ uv sync
 uv run python run.py  # Streamlit UI + tray + 2 scheduler watchdog threads
 ```
 
-Python >=3.13 required. Or use `installer/setup.exe` (build from `installer/`) for a guided install.
+Python >=3.13 required. Or use `launcher/launcher.exe` (build from `launcher/`) for a guided install.
 
-## Build the C++ installer
+## Build the C++ launcher
 
 ```bash
-cmake -B build -G "MinGW Makefiles" -DCMAKE_MAKE_PROGRAM=D:/software/gcc/bin/make.exe installer/
+cmake -B build -G "MinGW Makefiles" -DCMAKE_MAKE_PROGRAM=D:/software/gcc/bin/make.exe launcher/
 cmake --build build
-# Output: build/setup.exe (single file, zero external DLLs)
+# Output: build/launcher.exe (single file, zero external DLLs)
 ```
 
 ## Startup flow

@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def _load_env():
-    path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
     if os.path.exists(path):
         for line in open(path, encoding="utf-8"):
             line = line.strip()

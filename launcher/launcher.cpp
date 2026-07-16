@@ -20,11 +20,12 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <conio.h>
 
 namespace fs = std::filesystem;
 
 // 前向声明
-int InstallFlow(std::wstring projRoot);
+int InstallFlow(std::wstring projDir);
 int LaunchFlow(const std::wstring &projDir);
 
 // ─── 控制台输出 ─────────────────────────────────────
@@ -90,16 +91,15 @@ void PrintBanner()
 {
     PrintColor(C_CYAN, "╔══════════════════════════════════════════╗\n");
     PrintColor(C_CYAN, "║  ");
-    PrintColor(C_BRIGHT, "PaceTrace 行迹  安装工具  v0.3.0");
-    PrintColor(C_CYAN, "        ║\n");
+    PrintColor(C_BRIGHT, "PaceTrace 行迹  启动器  v0.3.0");
+    PrintColor(C_CYAN, "          ║\n");
     PrintColor(C_CYAN, "╚══════════════════════════════════════════╝\n");
 }
 
 void PauseGet()
 {
     Print("\n  请按 Enter 继续...");
-    char buf[64];
-    fgets(buf, sizeof(buf), stdin);
+    while (_getch() != '\r');
 }
 
 void PauseExit(int code)
@@ -154,19 +154,8 @@ std::wstring GetExeDir()
 
 std::wstring GetProjectRoot()
 {
-    // exe 在 installer/ 或 build/ 下，取父目录
-    auto dir = GetExeDir();
-    wchar_t parent[2048];
-    wcscpy_s(parent, dir.c_str());
-    PathRemoveFileSpecW(parent);
-
-    wchar_t runPy[2048];
-    wcscpy_s(runPy, parent);
-    PathAppendW(runPy, L"run.py");
-    if (GetFileAttributesW(runPy) != INVALID_FILE_ATTRIBUTES)
-        return parent;
-
-    return dir;
+    // 项目根目录就是 exe 所在目录，不爬父目录
+    return GetExeDir();
 }
 
 bool FileExists(const std::wstring &path)
@@ -336,54 +325,6 @@ bool HttpDownload(const std::wstring &url, const std::wstring &dest)
     return true;
 }
 
-// ─── Python 检测 ────────────────────────────────────
-
-struct PythonInfo
-{
-    std::wstring exe;
-    int major = 0;
-    int minor = 0;
-};
-
-PythonInfo FindPython(int minMajor, int minMinor)
-{
-    PythonInfo result;
-    const wchar_t *candidates[] = {L"py", L"python3", L"python"};
-
-    for (auto name : candidates)
-    {
-        std::wstring cmd;
-        if (wcscmp(name, L"py") == 0)
-        {
-            wchar_t verStr[16];
-            swprintf_s(verStr, L"-%d.%d", minMajor, minMinor);
-            cmd = std::wstring(L"\"") + name + L"\" " + verStr + L" --version 2>&1";
-        }
-        else
-        {
-            cmd = std::wstring(L"\"") + name + L"\" --version 2>&1";
-        }
-
-        auto r = RunCapture(cmd);
-        if (r.exitCode != 0)
-            continue;
-
-        int maj = 0, min = 0;
-        auto pos = r.output.find("Python ");
-        if (pos == std::string::npos)
-            continue;
-        sscanf(r.output.c_str() + pos, "Python %d.%d", &maj, &min);
-        if (maj >= minMajor && min >= minMinor)
-        {
-            result.exe = name;
-            result.major = maj;
-            result.minor = min;
-            break;
-        }
-    }
-    return result;
-}
-
 // ─── UV 管理 ───────────────────────────────────────────
 
 bool IsUvInstalled()
@@ -452,8 +393,9 @@ int GitClone(const std::wstring &url, const std::wstring &branch, const std::wst
 
 int GitPull(const std::wstring &repoDir, const std::wstring &branch)
 {
-    Print("  更新代码...\n");
-    std::wstring cmd = L"git -C \"" + repoDir + L"\" pull origin " + branch;
+    Print("  强制更新代码（将覆盖本地修改）...\n");
+    std::wstring cmd = L"git -C \"" + repoDir + L"\" fetch --all"
+        + L" && git -C \"" + repoDir + L"\" reset --hard origin/" + branch;
     return RunPassthrough(cmd);
 }
 
@@ -488,12 +430,21 @@ void CopyEnvExample(const std::wstring &projDir)
 
 bool DeleteDirectory(const std::wstring &path)
 {
-    SHFILEOPSTRUCTW fo = {0};
-    fo.wFunc = FO_DELETE;
-    std::wstring doubleNull = path + L"\0";
-    fo.pFrom = doubleNull.c_str();
-    fo.fFlags = FOF_NO_UI | FOF_SILENT | FOF_NOCONFIRMATION;
-    return SHFileOperationW(&fo) == 0;
+    // 先切到 temp 目录，释放对项目目录的 cwd 锁
+    wchar_t tmp[MAX_PATH];
+    GetTempPathW(MAX_PATH, tmp);
+    SetCurrentDirectoryW(tmp);
+
+    for (int i = 0; i < 3; i++)
+    {
+        std::wstring cmd = L"cmd.exe /c rmdir /s /q \"" + path + L"\"";
+        int ec = RunPassthrough(cmd);
+        if (ec == 0 && !DirExists(path))
+            return true;
+        if (i < 2)
+            Sleep(1000);
+    }
+    return false;
 }
 
 // ─── 创建快捷方式（开机启动）──────────────────────
@@ -544,7 +495,6 @@ bool CreateStartupShortcut(const std::wstring &targetExe, const std::wstring &ar
 
 struct InstallConfig
 {
-    bool useUv = true;
     std::wstring repoUrl = L"https://gitee.com/pfolg/pacetrace.git";
     std::wstring branch = L"main";
     std::wstring mirror = L"https://pypi.tuna.tsinghua.edu.cn/simple";
@@ -557,59 +507,32 @@ bool IsInsideRepo(const std::wstring &dir)
     return FileExists(gitDir) || DirExists(gitDir);
 }
 
-int InstallFlow(std::wstring projRoot)
+int InstallFlow(std::wstring projDir)
 {
     InstallConfig cfg;
-    cfg.projDir = projRoot + L"\\PaceTrace";
+    cfg.projDir = projDir;
 
-    // ── [1/5] 安装方式 ──
-    PrintHeader("1/5 选择安装方式");
-    Print("  1. uv（推荐，快速）\n");
-    Print("  2. pip（传统）\n");
-    Print("  默认 uv\n");
-    std::string mode = ReadLine();
-    cfg.useUv = (mode != "2");
+    // ── [1/4] 检查 uv + Git ──
+    PrintHeader("1/4 检查环境");
 
-    // ── [2/5] 环境检查 ──
-    PrintHeader("2/5 环境检查");
-
-    if (cfg.useUv)
+    if (!IsUvInstalled())
     {
-        // 检查/安装 uv
-        if (!IsUvInstalled())
+        PrintfColor(C_YELLOW, "  uv 未安装\n");
+        if (!YesNo("是否自动安装 uv？"))
         {
-            PrintfColor(C_YELLOW, "  uv 未安装\n");
-            if (!YesNo("是否自动安装 uv？"))
-            {
-                PrintfColor(C_RED, "  取消安装\n");
-                return 1;
-            }
-            if (!InstallUv())
-            {
-                PauseExit(1);
-            }
+            PrintfColor(C_RED, "  取消安装\n");
+            return 1;
         }
-        else
+        if (!InstallUv())
         {
-            PrintfColor(C_GREEN, "  uv 已安装\n");
+            PauseExit(1);
         }
     }
     else
     {
-        // 检查 Python
-        Print("  检查 Python...\n");
-        auto py = FindPython(3, 13);
-        if (py.exe.empty())
-        {
-            PrintfColor(C_RED, "  未找到 Python >= 3.13\n");
-            Print("  请先安装: https://www.python.org/downloads/\n");
-            PauseExit(1);
-        }
-        PrintfColor(C_GREEN, "  Python %d.%d 已找到: %ls\n",
-                    py.major, py.minor, py.exe.c_str());
+        PrintfColor(C_GREEN, "  uv 已安装\n");
     }
 
-    // 检查 Git（两种模式都需要）
     Print("  检查 Git...\n");
     if (!FindExe(L"git"))
     {
@@ -618,8 +541,8 @@ int InstallFlow(std::wstring projRoot)
     }
     PrintfColor(C_GREEN, "  Git 已安装\n");
 
-    // ── [3/5] 仓库源 + 分支 ──
-    PrintHeader("3/5 仓库源 + 分支");
+    // ── [2/4] 仓库源 + 分支 ──
+    PrintHeader("2/4 仓库源 + 分支");
 
     Print("  请选择仓库源:\n");
     Print("    1. GitHub  (github.com/igugyj/pacetrace)\n");
@@ -652,8 +575,8 @@ int InstallFlow(std::wstring projRoot)
         cfg.branch.resize(len - 1);
     }
 
-    // ── [4/5] Git 同步 ──
-    PrintHeader("4/5 克隆 / 更新代码");
+    // ── [3/4] Git 同步 + .env ──
+    PrintHeader("3/4 克隆 / 更新代码");
 
     if (!YesNo("同步代码？"))
     {
@@ -661,11 +584,6 @@ int InstallFlow(std::wstring projRoot)
     }
     else
     {
-        if (IsInsideRepo(projRoot))
-        {
-            cfg.projDir = projRoot;
-        }
-
         if (IsInsideRepo(cfg.projDir))
         {
             GitPull(cfg.projDir, cfg.branch);
@@ -688,74 +606,20 @@ int InstallFlow(std::wstring projRoot)
         PrintfColor(C_GREEN, "  代码同步完成\n");
     }
 
-    // .env 初始化
     CopyEnvExample(cfg.projDir);
 
-    // ── [5/5] 安装依赖 ──
-    PrintHeader("5/5 安装依赖");
+    // ── [4/4] uv sync ──
+    PrintHeader("4/4 安装依赖");
 
-    if (cfg.useUv)
+    Printf("  uv sync --index-url %ls\n", cfg.mirror.c_str());
+    std::wstring cmd = L"uv sync --directory \"" + cfg.projDir + L"\" --index-url " + cfg.mirror;
+    int ec = RunPassthrough(cmd);
+    if (ec != 0)
     {
-        Printf("  uv sync --index-url %ls\n", cfg.mirror.c_str());
-        std::wstring cmd = L"uv sync --directory \"" + cfg.projDir + L"\" --index-url " + cfg.mirror;
-        int ec = RunPassthrough(cmd);
-        if (ec != 0)
-        {
-            PrintfColor(C_RED, "  uv sync 失败\n");
-            PauseExit(1);
-        }
-        PrintfColor(C_GREEN, "  依赖安装完成\n");
+        PrintfColor(C_RED, "  uv sync 失败\n");
+        PauseExit(1);
     }
-    else
-    {
-        auto py = FindPython(3, 13);
-        if (py.exe.empty())
-        {
-            PrintfColor(C_RED, "  未找到 Python >= 3.13\n");
-            PauseExit(1);
-        }
-
-        auto venvDir = cfg.projDir + L"\\.venv";
-        auto venvPython = venvDir + L"\\Scripts\\python.exe";
-
-        if (DirExists(venvDir))
-        {
-            Print("  虚拟环境已存在，跳过创建\n");
-        }
-        else
-        {
-            Print("  创建虚拟环境...\n");
-            std::wstring cmd = std::wstring(py.exe) + L" -m venv \"" + venvDir + L"\"";
-            int ec = RunPassthrough(cmd);
-            if (ec != 0)
-            {
-                PrintfColor(C_RED, "  虚拟环境创建失败\n");
-                PauseExit(1);
-            }
-        }
-
-        Print("  升级 pip...\n");
-        std::wstring pipUpgrade = L"\"" + venvPython + L"\" -m pip install --upgrade pip -i " + cfg.mirror + L" --quiet";
-        RunPassthrough(pipUpgrade);
-
-        auto reqFile = cfg.projDir + L"\\requirements.txt";
-        if (FileExists(reqFile))
-        {
-            Printf("  pip install -r requirements.txt (%ls)\n", cfg.mirror.c_str());
-            std::wstring pipInstall = L"\"" + venvPython + L"\" -m pip install -r \"" + reqFile + L"\" -i " + cfg.mirror;
-            int ec = RunPassthrough(pipInstall);
-            if (ec != 0)
-            {
-                PrintfColor(C_RED, "  pip install 失败\n");
-                PauseExit(1);
-            }
-            PrintfColor(C_GREEN, "  依赖安装完成\n");
-        }
-        else
-        {
-            PrintfColor(C_YELLOW, "  requirements.txt 不存在，跳过\n");
-        }
-    }
+    PrintfColor(C_GREEN, "  依赖安装完成\n");
 
     PrintfColor(C_GREEN, "\n  ✓ 安装完成\n");
 
@@ -777,6 +641,8 @@ int LaunchFlow(const std::wstring &projDir)
         PrintfColor(C_RED, "  run.py 未找到: %ls\n", runPy.c_str());
         PauseExit(1);
     }
+
+    CopyEnvExample(projDir);
 
     PrintfColor(C_GREEN, "\n  PaceTrace 启动中...\n");
     Print("  主界面:   http://localhost:8501\n");
@@ -813,36 +679,39 @@ int main()
     SetConsoleCP(CP_UTF8);
 
     auto projRoot = GetProjectRoot();
+    auto projDir = projRoot + L"\\PaceTrace";
 
     while (true)
     {
         system("cls");
         ShowMenu();
         std::string opt = ReadLine();
+        int choice = opt.empty() ? 0 : opt[0] - '0';
 
-        if (opt == "1")
+        switch (choice)
         {
-            InstallFlow(projRoot);
-        }
-        else if (opt == "2")
-        {
-            LaunchFlow(projRoot);
-        }
-        else if (opt == "3")
+        case 1:
+            InstallFlow(projDir);
+            break;
+        case 2:
+            LaunchFlow(projDir);
+            break;
+        case 3:
         {
             wchar_t exePath[2048];
             GetModuleFileNameW(nullptr, exePath, 2048);
-            bool ok = CreateStartupShortcut(exePath, L"--launch", projRoot,
+            bool ok = CreateStartupShortcut(exePath, L"--launch", projDir,
                                             L"PaceTrace - 自动启动");
             if (ok)
                 PrintfColor(C_GREEN, "  开机启动添加成功\n");
             else
                 PrintfColor(C_RED, "  添加失败\n");
             PauseGet();
+            break;
         }
-        else if (opt == "4")
+        case 4:
         {
-            auto targetDir = projRoot;
+            auto targetDir = projDir;
             Printf("  即将删除: %ls\n", targetDir.c_str());
             if (YesNo("确认删除？"))
             {
@@ -852,9 +721,11 @@ int main()
                     PrintfColor(C_RED, "  删除失败\n");
             }
             PauseGet();
+            break;
         }
-        else if (opt == "5")
-        {
+        case 5:
+            return 0;
+        default:
             break;
         }
     }
