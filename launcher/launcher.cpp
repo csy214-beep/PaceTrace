@@ -23,7 +23,7 @@
 #include <conio.h>
 
 namespace fs = std::filesystem;
-
+#define VERSION "v0.3.1"
 // 前向声明
 int InstallFlow(std::wstring projDir);
 int LaunchFlow(const std::wstring &projDir);
@@ -91,7 +91,7 @@ void PrintBanner()
 {
     PrintColor(C_CYAN, "╔══════════════════════════════════════════╗\n");
     PrintColor(C_CYAN, "║  ");
-    PrintColor(C_BRIGHT, "PaceTrace 行迹  启动器  v0.3.0");
+    PrintColor(C_BRIGHT, "PaceTrace 行迹  启动器  " VERSION);
     PrintColor(C_CYAN, "          ║\n");
     PrintColor(C_CYAN, "╚══════════════════════════════════════════╝\n");
 }
