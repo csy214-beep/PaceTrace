@@ -3,81 +3,74 @@
 ## Quick start
 
 ```bash
-python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
-python run.py  # launches Streamlit UI + tray + scheduler threads
+uv sync
+uv run python run.py  # Streamlit UI + tray + 2 scheduler watchdog threads
 ```
 
-## Entry point
+Python >=3.13 required. Or use `launcher/launcher.exe` (build from `launcher/`) for a guided install.
 
-`run.py` — starts 4 daemon threads (static drawer server :8852, system tray, club scheduler, run scheduler), then launches the Streamlit UI via `streamlit.web.cli`.
+## Build the C++ launcher
 
-## Project layout
-
-```
-run.py              # launcher
-src/
-  api/              # API client — custom MD5-based signature
-  frontend/         # Streamlit pages
-  lib/              # shared utils: geo, time, maps (used by both scheduler & frontend)
-  scheduler/        # background threads for auto sign-in & run
-  maps/             # route JSON files
-  tray/             # system tray icon
+```bash
+cmake -B build -G "MinGW Makefiles" -DCMAKE_MAKE_PROGRAM=D:/software/gcc/bin/make.exe launcher/
+cmake --build build
+# Output: build/launcher.exe (single file, zero external DLLs)
 ```
 
-## API client quirks
+## Startup flow
 
-`src/api/client.py` — every request is signed via `_build_sign()`:
-1. Sorts query params alphabetically, flattens `k=v`
-2. Concatenates: `k1v1k2v2...` + `APPKEY` + `APPSECRET` + (body JSON if POST)
+`run.py` starts 4 daemon threads (static drawer server :8852, system tray, club scheduler watchdog, run scheduler watchdog), then launches Streamlit via `streamlit.web.cli.main()`. After browser closes, schedulers keep running; Ctrl+C or tray exit kills process. Streamlit entrypoint: `src/frontend/app.py`.
+
+## API signing
+
+`src/api/client.py` — every request signed via `_build_sign()`:
+1. Sort query params alphabetically, flatten `k=v` (skip empty values)
+2. Concatenate: `k1v1k2v2...` + `APPKEY` + `APPSECRET` + (compact JSON body if POST/PUT/PATCH)
 3. MD5 of above, uppercase → `sign` header
 
-Required env vars: `APPKEY`, `APPSECRET`, `BASE_URL`, `UA`. Copy `.env.example` → `.env`.
+Env vars `APPKEY`, `APPSECRET`, `BASE_URL`, `UA` read at **api module import time** via `os.environ[]` — must be set before `from api import ...`. `run.py` loads `.env` via `python-dotenv`. `test.py` and `frontend/app.py` parse `.env` manually.
 
-## Club sign-in/back flow
+## Auth
 
-1. `club.get_sign_in_tf()` returns venue lat/lng + activity window + `signStatus`
-2. `scheduler/club.py` polls every 60s; when inside activity window, checks `signStatus`:
-   - `"0"` → POST `signInOrSignBack` with `signType: "1"` (sign in)
-   - `"1"` → POST `signInOrSignBack` with `signType: "2"` (sign back)
-3. Coordinates offset 100m from venue coords via `lib.geo.random_point()`
-4. POST body matches Java `SignBody`: `activityId`, `latitude`, `longitude`, `signType`, `studentId`
+`auth.login(phone, password)` → MD5(lowercase) hash password, POST `v1/auth/login/password` with device spoof (Xiaomi/Mi 10/Android 12, appVersions 1.8.5). Token saved to `.data/.token`; user dict to `.data/.user`. `ctx` singleton (`src/api/context.py`) holds `User` and `RunStandard`. Token expiry (code `30005`) caught in frontend's `api_call()` wrapper (forces re-login) but **not** caught by schedulers.
 
 ## Run submission
 
-Track point format (`lng-lat-timestamp-accuracy`):
-```json
-["104.3-30.6-1683988800000-8"]
-```
-- 4th field = GPS accuracy in meters (5–10)
-- `year_semester` MUST be fetched from `get_run_standard().semesterYear` — never hardcode (was hardcoded as `"20261"`, already fixed)
-- Schedulers and frontend both call `save_run_record_v2` (the `/new` endpoint)
+Active endpoint: `save_run_record_v2` → POST `v1/unirun/save/run/record/new`.
 
-## Maps
+| Field | Note |
+|---|---|
+| `yearSemester` | MUST fetch from `get_run_standard().semesterYear` — never hardcode |
+| `trackPoints` | JSON array of `"lng-lat-timestamp-accuracy"` strings. Timestamps in **milliseconds**, accuracy random 5–10m |
+| `runTime` / `runDistance` | Duration in minutes, distance in meters |
+| Device spoof | Same as login (Xiaomi, Mi 10, Android 12, appVersions 1.8.5) |
+| `innerSchool` | Always `"1"` |
 
-`src/maps/*.json` format:
-```json
-{"mapId":"1","mapName":"操场","mapData":["lng1,lat1","lng2,lat2",...]}
-```
-Coordinates in GCJ-02 (高德坐标系).
+Track builder in `src/lib/geo.py`: `build_track(route_coords, target_distance)` → evenly spaced points. Route coords from `src/maps/*.json` (GCJ-02 高德坐标系 — not WGS-84).
+
+## Club sign-in/back
+
+1. `club.get_sign_in_tf()` returns venue lat/lng, activity window, `signStatus`
+2. `signStatus == "0"` → POST sign-in (`signType: "1"`); `"1"` → sign-back (`signType: "2"`)
+3. Coordinates offset ~100m via `lib.geo.random_point()`
+4. Cross-day windows: if `endTime < startTime`, add 1 day to end
 
 ## Schedulers
 
-Two independent background threads (controlled via `.data/scheduler_club.json` and `.data/scheduler_run.json`):
-- Club: polls `get_sign_in_tf()` every 60s, auto sign-in/back
-- Run: checks weekday + time range schedule, submits fake run once per day
+Two watchdog threads poll state files every 10s, start/stop the actual scheduler thread:
 
-## Data storage
+- **Club** (`SignScheduler`, 60s interval): polls `get_sign_in_tf()`, auto sign-in/back during activity window. Before window → sleep until start; after window → sleep 1h.
+- **Run** (`RunScheduler`, 120s interval): checks weekday + time range, submits one fake run/day via `save_run_record_v2`.
 
-`.data/` (gitignored):
-- `.token` — cached auth token
-- `.user` — serialized user info
-- `scheduler_club.json`, `scheduler_run.json` — scheduler states
-- `app.log` — operation log
+State files (`.data/scheduler_club.json`, `.data/scheduler_run.json`) use `threading.Lock()`. Scheduler API calls do not handle token expiry.
 
-## Notable gotchas
+## Frontend
 
-- `os.system` calls fail on Windows with spaces in Python path → use `streamlit.web.cli` directly (done in `run.py`)
-- Year semester tie: `save_run_record` v1 is unused; `save_run_record_v2` is the active endpoint
-- No test framework or CI tests — `test.py` exists but is ad-hoc
-- Java reference code in `java/` dir is gitignored (decompiled Android APK)
-- Shared logic lives in `src/lib/`: `geo.py` (random_point, route_distance, build_track), `time.py` (parse_time), `maps.py` (load_maps). Don't duplicate these in scheduler or frontend.
+`src/frontend/` — Streamlit 1.57.0, 5 pages: 首页/跑步/俱乐部/我的/关于. Login gate checks `ctx.user.studentId`. Sidebar via `st.session_state.page`. Custom CSS at `style.css`.
+
+## Notes
+
+- `.data/` (gitignored) — `.token`, `.user`, scheduler state files, `app.log`. Log truncated on every start.
+- `AMAP_KEY` / `AMAP_SECURITY` optional — enables AMap tiles in folium + drawer at `http://127.0.0.1:8852/drawer.html`
+- `java/` dir gitignored (decompiled APK reference)
+- No test framework. `test.py` is ad-hoc interactive CLI.

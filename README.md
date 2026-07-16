@@ -23,15 +23,30 @@ A campus run management dashboard with club activity support, auto sign-in/run s
 
 ## Quick Start
 
+### Using uv (recommended)
+
+```bash
+git clone https://github.com/igugyj/PaceTrace.git
+cd PaceTrace
+uv sync
+uv run python run.py
+```
+
+### Using pip
+
 ```bash
 git clone https://github.com/igugyj/PaceTrace.git
 cd PaceTrace
 python -m venv .venv
-# source .venv/bin/activate    # Linux / macOS
 .venv\Scripts\activate         # Windows
+# source .venv/bin/activate    # Linux / macOS
 pip install -r requirements.txt
 python run.py
 ```
+
+### Using the launcher (Windows only)
+
+Build `launcher/launcher.exe` (see `launcher/README.md`) and run it — guides through cloning, dependency installation, and launch.
 
 Open `http://localhost:8501` in your browser.
 
@@ -39,8 +54,7 @@ Open `http://localhost:8501` in your browser.
 
 ```bash
 git pull origin main
-.venv\Scripts\activate        # or source .venv/bin/activate
-pip install -r requirements.txt --upgrade
+uv sync
 ```
 
 ## Configuration
@@ -67,24 +81,11 @@ AMAP_SECURITY=your_amap_security_code
 │   ├── maps/         # Built-in route data (JSON)
 │   ├── scheduler/    # Background scheduler (club + run)
 │   └── tray/         # System tray module
-├── scripts/          # Startup scripts (bat/sh)
+├── launcher/         # Windows setup tool (C++, single-file exe)
 ├── run.py            # Application entry point
 ├── .env              # Environment configuration
 └── requirements.txt
 ```
-
-## Dependencies
-
-| Library | Version | License | Purpose |
-|---------|---------|---------|---------|
-| streamlit | 1.57.0 | Apache 2.0 | Web UI framework |
-| requests | 2.34.1 | Apache 2.0 | HTTP client for API calls |
-| folium | 0.20.0 | MIT | Interactive route maps |
-| pystray | 0.19.5 | LGPL-3.0 | System tray icon |
-| Pillow | 12.2.0 | Historical | Tray icon rendering |
-| python-dotenv | 1.2.2 | BSD 3-Clause | Environment config loading |
-
-This project is subject to the terms of all above licenses.
 
 ## Thanks
 
